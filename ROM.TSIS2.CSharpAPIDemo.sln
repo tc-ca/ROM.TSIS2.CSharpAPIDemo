@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32516.85
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ROM.TSIS2.CSharpAPIDemo", "ROM.TSIS2.CSharpAPIDemo.csproj", "{57746816-4FCF-4B66-8894-CA4AC074D7C5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{57746816-4FCF-4B66-8894-CA4AC074D7C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57746816-4FCF-4B66-8894-CA4AC074D7C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57746816-4FCF-4B66-8894-CA4AC074D7C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57746816-4FCF-4B66-8894-CA4AC074D7C5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A57E8593-32FE-4F64-AC0F-D1007F660B05}
+	EndGlobalSection
+EndGlobal
