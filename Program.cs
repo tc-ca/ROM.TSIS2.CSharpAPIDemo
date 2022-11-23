@@ -82,6 +82,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                         Console.WriteLine();
                     }
                 }
+
+                // EXAMPLE - Retrieve all location types
+                var locationTypes = GetChoicesExample.GetChoices(svc.GetGlobalOptionSetMetadata("ts_locationtype"));
             }
 
             Console.Read();
