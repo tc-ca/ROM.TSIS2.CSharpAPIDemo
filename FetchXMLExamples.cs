@@ -58,5 +58,18 @@ namespace ROM.TSIS2.CSharpAPIDemo
               </entity>
             </fetch>
         ";
+
+        public const string All_Active_SecurityIncidents = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='true'>
+              <entity name='ts_securityincident'>
+                <attribute name='ts_securityincidentid' />
+                <attribute name='ts_name' />
+                <filter>
+                  <condition attribute='statecode' operator='eq' value='0' />
+                </filter>
+                <order attribute='ts_name' />
+              </entity>
+            </fetch>
+        ";
     }
 }
