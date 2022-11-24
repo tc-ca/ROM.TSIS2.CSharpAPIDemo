@@ -85,6 +85,28 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
                 // EXAMPLE - Retrieve all location types
                 var locationTypes = GetChoicesExample.GetChoices(svc.GetGlobalOptionSetMetadata("ts_locationtype"));
+
+                // EXAMPLE - Create a Security Incident
+                {
+                    Entity newSecurityIncident = new Entity("ts_securityincident");
+
+                    // Get a mode
+                    var modes = GetChoicesExample.GetChoices(svc.GetGlobalOptionSetMetadata("ts_securityincidentmode"));
+                    var selectedMode = modes[0];
+
+                    // Set the mode for the new Security Incident
+                    newSecurityIncident.Attributes["ts_mode"] = new OptionSetValue(Convert.ToInt32(selectedMode.Value));
+
+                    // Get a Reporting Company
+                    EntityCollection reportingCompanies = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Operational_AvSec_Stakeholders));
+                    var selectedReportingCompany = reportingCompanies[0].Id;
+
+                    // Set the reporting company for the new Security Incident
+                    newSecurityIncident.Attributes["ts_stakeholder"] = new EntityReference("account", Guid.Parse(selectedReportingCompany.ToString()));
+
+                    // Record the ID (GUID) of the new Security Incident
+                    var newSecurityIncidentID = svc.Create(newSecurityIncident);
+                }
             }
 
             Console.Read();
