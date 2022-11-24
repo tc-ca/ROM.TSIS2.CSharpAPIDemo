@@ -107,6 +107,20 @@ namespace ROM.TSIS2.CSharpAPIDemo
                     // Record the ID (GUID) of the new Security Incident
                     var newSecurityIncidentID = svc.Create(newSecurityIncident);
                 }
+
+                // EXAMPLE - Update a Security Incident
+                {
+                    // Get the record you want to update
+                    EntityCollection securityIncidents = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Active_SecurityIncidents));
+                    var selectedSecurityIncident = securityIncidents[0].Id;
+
+                    var updateSecurityIncident = new Entity("ts_securityincident", selectedSecurityIncident);
+
+                    // Update a field with some random text
+                    updateSecurityIncident.Attributes["ts_arrestsdetails"] = "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean";
+
+                    svc.Update(updateSecurityIncident);
+                }
             }
 
             Console.Read();
