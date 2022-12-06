@@ -1,26 +1,35 @@
-﻿using Microsoft.Xrm.Sdk;
+﻿using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 using Microsoft.Xrm.Tooling.Connector;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
-using System.Collections.Generic;
 using System.Configuration;
-using System.Linq;
-using System.Text;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 
 namespace ROM.TSIS2.CSharpAPIDemo
 {
     internal class Program
     {
+        // Retrieve the required values from Secrets.config
+        static string url = ConfigurationManager.AppSettings["Url"];
+        static string clientId = ConfigurationManager.AppSettings["ClientId"];
+        static string clientSecret = ConfigurationManager.AppSettings["ClientSecret"];
+        static string connectString = $"AuthType=ClientSecret;url={url};ClientId={clientId};ClientSecret={clientSecret}";
+        static string authority = ConfigurationManager.AppSettings["Authority"];
+
+        // API path for REST calls
+        static string apiPath = "/api/data/v9.2/";
+
         static void Main(string[] args)
         {
-            // Retrieve the required values from Secrets.config
-            string url = ConfigurationManager.AppSettings["Url"];
-            string clientId = ConfigurationManager.AppSettings["ClientId"];
-            string clientSecret = ConfigurationManager.AppSettings["ClientSecret"];
-            string connectString = $"AuthType=ClientSecret;url={url};ClientId={clientId};ClientSecret={clientSecret}";
+            // Connect to the TSIS 2 - ROM API using the HttpClient
+            Task.WaitAll(Task.Run(async () => await GetTableData()));
 
-            // Connect to the TSIS 2 - ROM API
+            // Connect to the TSIS 2 - ROM API using the CrmServiceClient
             using (var svc = new CrmServiceClient(connectString))
             {
                 // EXAMPLE - Retrieve all Regions in English
@@ -125,5 +134,50 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
             Console.Read();
         }
+
+        private static async Task GetTableData()
+        {
+            // Authenticate with the API
+            AuthenticationResult _authResult;
+            AuthenticationContext authenticationContext = new AuthenticationContext(authority);
+            ClientCredential credential = new ClientCredential(clientId, clientSecret);
+            _authResult = await authenticationContext.AcquireTokenAsync(url, credential);
+
+            using (HttpClient httpClient = new HttpClient())
+            {
+                httpClient.BaseAddress = new Uri(url);
+                httpClient.Timeout = new TimeSpan(0, 2, 0);
+                httpClient.DefaultRequestHeaders.Add("OData-MaxVersion", "4.0");
+                httpClient.DefaultRequestHeaders.Add("OData-Version", "4.0");
+                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _authResult.AccessToken);
+
+                // Make the GET call
+                // NOTE: Documentation on how to query data can be found here:
+                // https://learn.microsoft.com/en-us/power-apps/developer/data-platform/webapi/query-data-web-api
+
+                // Example of a filter being applied while we get all the sites
+                var response = httpClient.GetAsync(apiPath + "msdyn_functionallocations?$select=msdyn_functionallocationid,msdyn_name&$filter=ts_sitestatus eq 717750000").Result;
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var jRetrieveResponse = JObject.Parse(response.Content.ReadAsStringAsync().Result);
+                    dynamic collAccounts = JsonConvert.DeserializeObject(jRetrieveResponse.ToString());
+
+                    foreach (var data in collAccounts.value)
+                    {
+                        // Example of writing out the output
+                        Console.WriteLine("Site ID: " + data.msdyn_functionallocationid);
+                        Console.WriteLine("Site Name: " + data.msdyn_name);
+                        Console.WriteLine("");
+                    }
+                }
+                else
+                {
+                    return;
+                }
+            }
+        }
+
     }
 }
