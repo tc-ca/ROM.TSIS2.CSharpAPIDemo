@@ -1,5 +1,7 @@
 ﻿using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Messages;
+using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
 using Microsoft.Xrm.Tooling.Connector;
 using Newtonsoft.Json;
@@ -130,6 +132,27 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
                     svc.Update(updateSecurityIncident);
                 }
+
+                // EXAMPLE - Retrieve all column names of a table
+                {
+                    RetrieveEntityRequest retrieveEntityRequest = new RetrieveEntityRequest
+                    {
+                        EntityFilters = EntityFilters.All,
+                        LogicalName = "msdyn_functionallocation"
+                    };
+
+                    RetrieveEntityResponse retrieveAccountEntityResponse = (RetrieveEntityResponse)svc.Execute(retrieveEntityRequest);
+                    EntityMetadata entity = retrieveAccountEntityResponse.EntityMetadata;
+
+                    Console.WriteLine( $"{entity.SchemaName} - {entity.DisplayName.UserLocalizedLabel.Label} entity meta-data:");
+
+                    Console.WriteLine("Entity attributes:");
+                    foreach (object attribute in entity.Attributes)
+                    {
+                        AttributeMetadata a = (AttributeMetadata)attribute;
+                        Console.WriteLine(a.LogicalName);
+                    }
+                }
             }
 
             Console.Read();
@@ -157,7 +180,7 @@ namespace ROM.TSIS2.CSharpAPIDemo
                 // https://learn.microsoft.com/en-us/power-apps/developer/data-platform/webapi/query-data-web-api
 
                 // Example of a filter being applied while we get all the sites
-                var response = httpClient.GetAsync(apiPath + "msdyn_functionallocations?$select=msdyn_functionallocationid,msdyn_name&$filter=ts_sitestatus eq 717750000").Result;
+                var response = httpClient.GetAsync(apiPath + "msdyn_functionallocations?$select=msdyn_functionallocationid,msdyn_name&$filter=ts_sitestatus eq 717750000&$top=5").Result;
 
                 if (response.IsSuccessStatusCode)
                 {
