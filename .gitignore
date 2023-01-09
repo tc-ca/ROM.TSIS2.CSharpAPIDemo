@@ -350,3 +350,4 @@ MigrationBackup/
 .ionide/
 
 Secrets.config
+/CSharpAPIDemo-NetCore/Secrets.json
