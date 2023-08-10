@@ -43,32 +43,6 @@ namespace ROM.TSIS2.CSharpAPIDemo
             ";
         }
 
-        public const string All_Cases = @"
-            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
-              <entity name='incident'>
-                <attribute name='incidentid' />
-              </entity>            
-            </fetch>
-        ";
-
-        public const string All_WorkOrders = @"
-            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
-              <entity name='msdyn_workorder'>
-                <attribute name='msdyn_workorderid' />
-                <attribute name='ts_incident' />
-              </entity>            
-            </fetch>
-        ";
-
-        public const string All_WorkOrderServiceTasks = @"
-            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
-              <entity name='msdyn_workorderservicetask'>
-                <attribute name='msdyn_workorder' />
-                <attribute name='msdyn_workorderservicetaskid' />
-              </entity>         
-            </fetch>
-        ";
-
         public const string All_Files = @"
             <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
               <entity name='ts_file'>

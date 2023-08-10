@@ -36,9 +36,23 @@ namespace ROM.TSIS2.CSharpAPIDemo
         static List<FileItem>fileItems = new List<FileItem>();
         static List<FileItem>manyToManyFileItems = new List<FileItem>();
         static List<SharePointFileItem>sharePointFileItems = new List<SharePointFileItem>();
-        //static List<Case>caseItems = new List<Case>();
-        //static List<WorkOrder> workOrderItems = new List<WorkOrder>();
-        //static List<WorkOrderServiceTask> workOrderServiceTaskItems = new List<WorkOrderServiceTask>();
+
+        public static string Case = "Case";
+        public static string WorkOrder = "Work Order";
+        public static string WorkOrderServiceTask = "Work Order Service Task";
+        public static string Stakeholder = "Stakeholder";
+        public static string Site = "Site";
+        public static string Operation = "Operation";
+        public static string SecurityIncident = "Security Incident";
+        public static string Exemption = "Exemption";
+        public static string CaseFr = "Cas";
+        public static string WorkOrderFr = "Ordre de travail";
+        public static string WorkOrderServiceTaskFr = "Tâche de service de l'ordre de travail";
+        public static string StakeholderFr = "Partie prenante";
+        public static string SiteFr = "Site";
+        public static string OperationFr = "Opération";
+        public static string SecurityIncidentFr = "Incidents de sûreté";
+        public static string ExemptionFr = "Exemption";
 
         static async Task Main(string[] args)
         {
@@ -53,40 +67,6 @@ namespace ROM.TSIS2.CSharpAPIDemo
                 // Get all the files
                 {
                     EntityCollection files = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Files));
-
-                    // get all Cases,Work Orders, and Work Order Service Tasks
-                    EntityCollection cases = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Cases));
-                    EntityCollection workOrders = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_WorkOrders));
-                    EntityCollection workOrderServiceTasks = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Files_WorkOrderServiceTask));
-
-                    // put all Cases,Work Orders, and Work Order Service Tasks in a list
-                    //{
-                    //    foreach (var currentCase in cases.Entities)
-                    //    {
-                    //        caseItems.Add(new Case
-                    //        {
-                    //            CaseId = currentCase.GetAttributeValue<Guid>("incidentid").ToString()
-                    //        });
-                    //    }
-
-                    //    foreach (var currentWorkOrder in workOrders.Entities)
-                    //    {
-                    //        workOrderItems.Add(new WorkOrder
-                    //        {
-                    //            WorkOrderId = currentWorkOrder.GetAttributeValue<Guid>("msdyn_workorderid").ToString(),
-                    //            CaseId = currentWorkOrder.GetAttributeValue<Guid>("ts_incident").ToString()
-                    //        });
-                    //    }
-
-                    //    foreach (var currentWorkOrderServiceTask in workOrderServiceTasks.Entities)
-                    //    {
-                    //        workOrderServiceTaskItems.Add(new WorkOrderServiceTask
-                    //        {
-                    //            WorkOrderId = currentWorkOrderServiceTask.GetAttributeValue<Guid>("msdyn_workorderid").ToString(),
-                    //            WorkOrderServiceTaskId = currentWorkOrderServiceTask.GetAttributeValue<Guid>("msdyn_workorderservicetaskid").ToString()
-                    //        });
-                    //    }
-                    //}
 
                     // get all individual file records
                     {
@@ -386,24 +366,29 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                 if (sharePointFileItem.TableName == "Work Order")
                                 {
                                     // Does the Work Order Have a Case?
-                                    //var myWorkOrder = workOrderItems.FirstOrDefault(x => x.WorkOrderId == sharePointFileItem.TableRecordId);
                                     var myWorkOrder = GetRecordFromTable(svc, sharePointFileItem.TableRecordId, "msdyn_workorder");
 
-                                    var sharePointFileGroup = new Entity();
+                                    var caseSharePointFileGroup = new Entity();
 
-                                    var caseId = myWorkOrder.GetAttributeValue<EntityReference>("msdyn_servicerequest");
+                                    var caseIdValue = myWorkOrder.GetAttributeValue<EntityReference>("msdyn_servicerequest");
 
-                                    if (myWorkOrder!= null && caseId != null)
+                                    if (myWorkOrder!= null && caseIdValue != null)
                                     {
-                                        // Update the SharePointFile with the SharePointFileGroup of the Case
-                                        //var caseSharePoint = sharePointFileItems.FirstOrDefault(x => x.TableRecordId == caseId.ToString());
-                                        //NOTE: get the actual SharePoint file group from the database
-                                        sharePointFileGroup = GetOrCreateSharePointFileGroup(svc, caseSharePoint);
+                                        string caseIdString = caseIdValue.Id.ToString();
+
+                                        //Get the SharePointFileGroup of the Case
+                                        caseSharePointFileGroup = GetSingleRecordFromTableFetchXML(svc, FetchXMLExamples.SharePointFileGroupBySharePointFile(caseIdString));
+
+                                        //Set the SharePointFileGroupId of the SharePointFile for the Work Order
+                                        sharePointFileItem.SharePointFileGroupId = caseSharePointFileGroup.GetAttributeValue<EntityReference>("ts_sharepointfilegroup").Id.ToString();
+
+                                        // Update the SharePointFile
+                                        GetOrCreateSharePointFileGroup(svc, sharePointFileItem,true);
                                     }
                                     else
                                     {
                                         // Give the Work Order it's own separate SharePointFileGroup
-                                        sharePointFileGroup = GetOrCreateSharePointFileGroup(svc, sharePointFileItem);
+                                        sharePointFileItem.SharePointFileGroupId = GetOrCreateSharePointFileGroup(svc, sharePointFileItem).Id.ToString();
                                     }
                                 }
 
@@ -559,8 +544,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
             return fileItems;
         }
 
-        public static Entity GetOrCreateSharePointFileGroup(IOrganizationService svc, SharePointFileItem sharePointFileItem)
+        public static Entity GetOrCreateSharePointFileGroup(IOrganizationService svc, SharePointFileItem sharePointFileItem, bool usingExistingSharePointFileGroup = false)
         {
+            // This will get or create the SharePoint File Group and update the SharePoint File
             Entity sharePointFileGroup = null;
 
             EntityCollection sharePointFileGroups = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.SharePointFileGroupBySharePointFile(sharePointFileItem.TableRecordId)));
@@ -577,9 +563,19 @@ namespace ROM.TSIS2.CSharpAPIDemo
                 if (sharePointFileRecord != null)
                 {
                     Entity newSharePointFileGroup = new Entity("ts_sharepointfilegroup");
-                    var newSharePointFileGroupID = svc.Create(newSharePointFileGroup);
 
-                    sharePointFileRecord["ts_sharepointfilegroup"] = new EntityReference("ts_sharepointfilegroup", newSharePointFileGroupID);
+                    Guid sharePointFileGroupID = Guid.Empty;
+
+                    if (!usingExistingSharePointFileGroup)
+                    {
+                        sharePointFileGroupID = svc.Create(newSharePointFileGroup);
+                    }
+                    else
+                    {
+                        sharePointFileGroupID = new Guid(sharePointFileItem.SharePointFileGroupId);
+                    }
+
+                    sharePointFileRecord["ts_sharepointfilegroup"] = new EntityReference("ts_sharepointfilegroup", sharePointFileGroupID);
                     svc.Update(sharePointFileRecord);
 
                     sharePointFileGroup = newSharePointFileGroup;
@@ -595,6 +591,17 @@ namespace ROM.TSIS2.CSharpAPIDemo
             ColumnSet columns = new ColumnSet(true);
             Guid recordIdGuid = new Guid(recordId);
             entity = svc.Retrieve(tableName, recordIdGuid, columns);
+            return entity;
+        }
+
+        public static Entity GetSingleRecordFromTableFetchXML(IOrganizationService svc, string fetchXML)
+        {
+            Entity entity = null;
+
+            EntityCollection entityCollection = svc.RetrieveMultiple(new FetchExpression(fetchXML));
+
+            entity = entityCollection.Entities.Count > 0 ? entityCollection.Entities[0] : null;
+
             return entity;
         }
     }
