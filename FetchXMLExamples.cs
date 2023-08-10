@@ -8,6 +8,150 @@ namespace ROM.TSIS2.CSharpAPIDemo
 {
     public static class FetchXMLExamples
     {
+        public static string SharePointFileGroupBySharePointFile(string tableRecordId)
+        {
+            return $@"
+                <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+                  <entity name='ts_sharepointfile'>
+                    <attribute name='ts_sharepointfileid' />
+                    <attribute name='ts_sharepointfilegroup' />
+                    <attribute name='ts_tablerecordid' />
+                    <attribute name='ts_tablename' />
+                    <link-entity name='ts_sharepointfilegroup' to='ts_sharepointfilegroup' from='ts_sharepointfilegroupid' alias='ts_sharepointfilegroup' link-type='inner' />
+                    <filter>
+                      <condition attribute='ts_tablerecordid' operator='eq' value='{tableRecordId}' />
+                    </filter>
+                  </entity>                
+                </fetch>            
+            ";
+        }
+
+        public static string Single_SharePointFile(string tableRecordId)
+        {
+            return $@"
+                <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+                  <entity name='ts_sharepointfile'>
+                    <attribute name='ts_sharepointfilegroup' />
+                    <attribute name='ts_sharepointfileid' />
+                    <attribute name='ts_tablename' />
+                    <attribute name='ts_tablerecordid' />
+                    <filter>
+                      <condition attribute='ts_tablerecordid' operator='eq' value='{tableRecordId}' />
+                    </filter>
+                  </entity>
+                </fetch>            
+            ";
+        }
+
+        public const string All_Cases = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='incident'>
+                <attribute name='incidentid' />
+              </entity>            
+            </fetch>
+        ";
+
+        public const string All_WorkOrders = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='msdyn_workorder'>
+                <attribute name='msdyn_workorderid' />
+                <attribute name='ts_incident' />
+              </entity>            
+            </fetch>
+        ";
+
+        public const string All_WorkOrderServiceTasks = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='msdyn_workorderservicetask'>
+                <attribute name='msdyn_workorder' />
+                <attribute name='msdyn_workorderservicetaskid' />
+              </entity>         
+            </fetch>
+        ";
+
+        public const string All_Files = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='ts_file'>
+                <attribute name='ts_fileid' />
+                <attribute name='ts_file' />
+                <attribute name='ts_uploadedtosharepoint' />
+                <attribute name='ts_exemption' />
+                <attribute name='ts_finding' />
+                <attribute name='ts_incident' />
+                <attribute name='ts_msdyn_workorder' />
+                <attribute name='ts_ovs_operation' />
+                <attribute name='ts_securityincident' />
+                <attribute name='ts_site' />
+                <attribute name='ts_stakeholder' />
+                <attribute name='ts_workorderservicetask' />
+                <attribute name='ts_formintegrationid' />
+              </entity>
+            </fetch>
+        ";
+
+        public const string All_Files_Cases = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='ts_files_incidents'>
+                <attribute name='incidentid' />
+                <attribute name='ts_fileid' />
+              </entity>
+            </fetch>        
+        ";
+
+        public const string All_Files_WorkOrders = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='ts_files_msdyn_workorders'>
+                <attribute name='msdyn_workorderid' />
+                <attribute name='ts_fileid' />
+              </entity>
+            </fetch>        
+        ";
+
+        public const string All_Files_WorkOrderServiceTask = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='ts_files_msdyn_workorderservicetasks'>
+                <attribute name='msdyn_workorderservicetaskid' />
+                <attribute name='ts_fileid' />
+              </entity>
+            </fetch>        
+        ";
+
+        public const string All_Files_Findings = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='ts_ovs_finding_ts_file'>
+                <attribute name='ovs_findingid' />
+                <attribute name='ts_fileid' />
+              </entity>
+            </fetch>        
+        ";
+
+        public const string All_Files_Sites = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='ts_files_msdyn_functionallocations'>
+                <attribute name='msdyn_functionallocationid' />
+                <attribute name='ts_fileid' />
+              </entity>
+            </fetch>        
+        ";
+
+        public const string All_Files_Operations = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='ts_files_ovs_operations'>
+                <attribute name='ovs_operationid' />
+                <attribute name='ts_fileid' />
+              </entity>
+            </fetch>        
+        ";
+
+        public const string All_Files_Stakeholders = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='ts_files_accounts'>
+                <attribute name='accountid' />
+                <attribute name='ts_fileid' />
+              </entity>
+            </fetch>        
+        ";
+
         public const string All_Regions_English = @"
             <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='true'>
               <entity name='territory'>

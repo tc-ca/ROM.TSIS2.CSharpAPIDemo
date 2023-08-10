@@ -38,6 +38,40 @@ namespace CSharpAPIDemo_NetCore
             }
         }
 
+        public static string WorkOrders()
+        {
+            return @"
+                        <fetch>
+                          <entity name='msdyn_workorder'>
+                            <attribute name='msdyn_workorderid' />
+                            <attribute name='msdyn_name' />
+                            <attribute name='ovs_operationtypeid' />
+                            <link-entity name='ovs_operationtype' to='ovs_operationtypeid' from='ovs_operationtypeid' alias='ovs_operationtype' link-type='inner'>
+                              <attribute name='ownerid' />
+                            </link-entity>
+                          </entity>
+                        </fetch>                ";
+        }
+
+        public static string WorkOrderServiceTask()
+        {
+            return @"
+
+                    <fetch >
+                      <entity name='msdyn_workorderservicetask'>
+                        <attribute name='msdyn_name' />
+                        <link-entity name='msdyn_workorder' to='msdyn_workorder' from='msdyn_workorderid' alias='msdyn_workorder' link-type='inner'>
+                          <attribute name='msdyn_workorderid' />
+                          <attribute name='msdyn_name' />
+                          <attribute name='ovs_operationtypeid' />
+                          <link-entity name='ovs_operationtype' to='ovs_operationtypeid' from='ovs_operationtypeid' alias='ovs_operationtype' link-type='inner'>
+                            <attribute name='ownerid' />
+                          </link-entity>
+                        </link-entity>
+                      </entity>
+                    </fetch>            ";
+        }
+
         public static string TargetElements(bool english = true)
         {
             if (english)

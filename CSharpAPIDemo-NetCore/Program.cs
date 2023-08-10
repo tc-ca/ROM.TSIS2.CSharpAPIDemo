@@ -37,13 +37,84 @@ namespace CSharpAPIDemo_NetCore
             {
                 // Lookups
                 {
+                    // Retrieve all Files
+                    {
+                        //string filePath = @"C:\Users\petrier\Desktop\270413 File Ownership.txt";
+
+                        // List to store our output
+                        List<string> myOutput = new List<string>();
+
+                        //using (StreamReader streamReader = new StreamReader(filePath))
+                        //{
+                        //    string line;
+
+                        //    // Get all Work Orders and Work Order Service Tasks
+                        //    EntityCollection workOrders = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.WorkOrders()));
+
+                        //    EntityCollection workOrderServiceTasks = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.WorkOrderServiceTask()));
+
+                        //    // Read and display lines from the file until the end is reached
+                        //    while ((line = streamReader.ReadLine()) != null)
+                        //    {
+                        //        if (!line.Contains("NULL"))
+                        //        {
+                        //            // is it a Work Order?
+                        //            if (line.Contains("WO "))
+                        //            {
+                        //                var workOrderNumber = line.Replace("Yes	WO ", "");
+                        //                foreach (var workOrder in workOrders.Entities)
+                        //                {
+                        //                    if (workOrder.GetAttributeValue<string>("msdyn_name") == workOrderNumber)
+                        //                    {
+                        //                        AliasedValue owner = workOrder.GetAttributeValue<AliasedValue>("ovs_operationtype.ownerid");
+                        //                        //site.GetAttributeValue<double>(LookupColumns.Site.Longitude).ToString()
+                        //                        //myOutput.Add(owner.Name);
+
+                        //                        if (owner.Value is EntityReference entityRef)
+                        //                        {
+                        //                            myOutput.Add(entityRef.Name + " " + workOrderNumber );
+                        //                            //break;
+                        //                        }
+                        //                    }  
+                        //                }
+                        //            }
+                        //            else if(line.Contains("WOST"))
+                        //            {
+                        //                var workOrderServiceTaskNumber = line.Replace("Yes	WOST ", "");
+                        //                foreach (var workOrderServiceTask in workOrderServiceTasks.Entities)
+                        //                {
+                        //                    if (workOrderServiceTask.GetAttributeValue<string>("msdyn_name") == workOrderServiceTaskNumber)
+                        //                    {
+                        //                        AliasedValue owner = workOrderServiceTask.GetAttributeValue<AliasedValue>("ovs_operationtype.ownerid");
+                        //                        //site.GetAttributeValue<double>(LookupColumns.Site.Longitude).ToString()
+                        //                        //myOutput.Add(owner.Name);
+
+                        //                        if (owner.Value is EntityReference entityRef)
+                        //                        {
+                        //                            myOutput.Add(entityRef.Name + " " + workOrderServiceTaskNumber);
+                        //                            //break;
+                        //                        }
+                        //                    }
+                        //                }
+
+                        //            }
+                        //        }
+                        //        else
+                        //        {
+                        //            myOutput.Add("");
+                        //        }
+                        //    }
+                        //}
+                    }
+
+
                     // Retrieve all Security Incident Types
                     {
                         // English
-                        EntityCollection securityIncidentTypesEnglish = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.SecurityIncidents()));
+                        //EntityCollection securityIncidentTypesEnglish = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.SecurityIncidents()));
 
                         // French - Use this to retrieve the French names
-                        EntityCollection securityIncidentTypesFrench = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.SecurityIncidents(false)));
+                        //EntityCollection securityIncidentTypesFrench = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.SecurityIncidents(false)));
 
                         //Console.WriteLine("Security Incident Types:");
 
@@ -60,10 +131,10 @@ namespace CSharpAPIDemo_NetCore
                     // Retrieve all Target Elements
                     {
                         // English
-                        EntityCollection targetElementEnglish = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.TargetElements()));
+                        //EntityCollection targetElementEnglish = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.TargetElements()));
 
                         // French - Use this to retrieve the French names
-                        EntityCollection targetElementFrench = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.TargetElements(false)));
+                        //EntityCollection targetElementFrench = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.TargetElements(false)));
 
                         //Console.WriteLine("Target Elements:");
 
@@ -81,7 +152,7 @@ namespace CSharpAPIDemo_NetCore
                     // Reporting Company and Stakeholder reside in the same table in ROM
                     {
                         // English
-                        EntityCollection reportingCompany = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.ReportingCompany()));
+                        //EntityCollection reportingCompany = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.ReportingCompany()));
 
                         //Console.WriteLine("Reporting Companies:");
 
@@ -98,7 +169,7 @@ namespace CSharpAPIDemo_NetCore
                     // Retrieve all Stakeholder Operation Types
                     {
                         // English
-                        EntityCollection stakeholderOperationTypesEnglish = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.StakeholderOperationType()));
+                        //EntityCollection stakeholderOperationTypesEnglish = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.StakeholderOperationType()));
 
                         // French - Use this to retrieve the French names
                         EntityCollection stakeholderOperationTypesFrench = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.TargetElements(false)));
@@ -118,10 +189,10 @@ namespace CSharpAPIDemo_NetCore
                     // Retrieve all Regions
                     {
                         // English
-                        EntityCollection regionsEnglish = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.Region()));
+                        //EntityCollection regionsEnglish = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.Region()));
 
                         // French - Use this to retrieve the French names
-                        EntityCollection regionsFrench = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.Region(false)));
+                        //EntityCollection regionsFrench = svc.RetrieveMultiple(new FetchExpression(LookupFetchXML.Region(false)));
 
                         //Console.WriteLine("Regions:");
 
@@ -161,7 +232,7 @@ namespace CSharpAPIDemo_NetCore
                 {
                     // Retrieve all Programs
                     {
-                        var programs = Choice.GetChoices(svc.GetGlobalOptionSetMetadata(ChoiceOptions.Program.GlobalOptionSetName));
+                        //var programs = Choice.GetChoices(svc.GetGlobalOptionSetMetadata(ChoiceOptions.Program.GlobalOptionSetName));
 
                         //Console.WriteLine("Programs:");
 
@@ -183,11 +254,22 @@ namespace CSharpAPIDemo_NetCore
                 {
                     Entity newSecurityIncident = new Entity("ts_securityincident");
 
-                    // Get a mode
+                    // Get a mode - AvSec
                     var selectedMode = 717750002;
 
                     // Set the mode for the new Security Incident
                     newSecurityIncident.Attributes["ts_mode"] = new OptionSetValue(Convert.ToInt32(selectedMode));
+
+                    // Set the Incident date/time
+                    newSecurityIncident.Attributes["ts_incidentdatetime"] = "2023-07-25 05:00:00.000";
+
+                    // Set the Reported date/time
+                    newSecurityIncident.Attributes["ts_reporteddatetime"] = "2023-07-25 10:00:00.000";
+
+                    // Set the TimeZone
+                    newSecurityIncident.Attributes["ts_timezone"] = 717750001;
+
+                    //newSecurityIncident.Attributes["ts_incidentdetailsattachment"] = Convert.ToBase64String(Encoding.UTF8.GetBytes(@"<p>Event details are not provided.</p>"));
 
                     // Record the ID (GUID) of the new Security Incident
                     var newSecurityIncidentID = svc.Create(newSecurityIncident);
@@ -195,34 +277,41 @@ namespace CSharpAPIDemo_NetCore
                     newSecurityIncident.Id = newSecurityIncidentID;
 
                     // Set the file attachment details
-                    Guid? fileId = null;
+                    //Guid? fileId = null;
 
-                    string fileName = "My Details.txt";
-                    FileInfo fi = new FileInfo(fileName);
+                    //string fileName = "My Details.txt";
+                    //FileInfo fi = new FileInfo(fileName);
 
-                    string fileContents = @"<p>Event details are not provided.</p>";
+                    //string fileContents = @"<p>Event details are not provided.</p>";
 
-                    using (FileStream fs = fi.Create())
-                    {
-                        byte[] data = Encoding.UTF8.GetBytes(fileContents);
-                        fs.Write(data, 0, data.Length);
-                    }
+                    //using (FileStream fs = fi.Create())
+                    //{
+                    //    byte[] data = Encoding.UTF8.GetBytes(fileContents);
+                    //    fs.Write(data, 0, data.Length);
+                    //}
 
                     // Upload the file
-                    try
-                    {
-                        fileId = UploadFile(svc,
-                           newSecurityIncident.ToEntityReference(),
-                           "ts_incidentdetailsattachment",
-                           fi,
-                           "text/plain");
+                    //try
+                    //{
+                    //    fileId = UploadFile(svc,
+                    //       newSecurityIncident.ToEntityReference(),
+                    //       "ts_incidentdetailsattachment",
+                    //       fi,
+                    //       "text/plain");
 
-                        Console.WriteLine($"Uploaded file {fileName}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex.Message);
-                    }
+                    //    Console.WriteLine($"Uploaded file {fileName}");
+                    //}
+                    //catch (Exception ex)
+                    //{
+                    //    Console.WriteLine(ex.Message);
+                    //}
+
+                    //DeleteFileRequest deleteFileRequest = new()
+                    //{
+                    //    FileId = fileId.Value
+                    //};
+
+                    //serviceClient.Execute(deleteFileRequest);
                 }
 
                 Console.ReadLine();
