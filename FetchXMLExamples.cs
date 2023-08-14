@@ -17,6 +17,7 @@ namespace ROM.TSIS2.CSharpAPIDemo
                     <attribute name='ts_sharepointfilegroup' />
                     <attribute name='ts_tablerecordid' />
                     <attribute name='ts_tablename' />
+                    <attribute name='ts_tablenamefrench' />
                     <link-entity name='ts_sharepointfilegroup' to='ts_sharepointfilegroup' from='ts_sharepointfilegroupid' alias='ts_sharepointfilegroup' link-type='inner' />
                     <filter>
                       <condition attribute='ts_tablerecordid' operator='eq' value='{tableRecordId}' />
@@ -34,7 +35,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                     <attribute name='ts_sharepointfilegroup' />
                     <attribute name='ts_sharepointfileid' />
                     <attribute name='ts_tablename' />
+                    <attribute name='ts_tablenamefrench' />
                     <attribute name='ts_tablerecordid' />
+                    <attribute name='ts_tablerecordname' />
                     <filter>
                       <condition attribute='ts_tablerecordid' operator='eq' value='{tableRecordId}' />
                     </filter>
@@ -68,7 +71,10 @@ namespace ROM.TSIS2.CSharpAPIDemo
               <entity name='ts_files_incidents'>
                 <attribute name='incidentid' />
                 <attribute name='ts_fileid' />
-              </entity>
+                <link-entity name='incident' to='incidentid' from='incidentid' alias='incident' link-type='inner'>
+                  <attribute name='title' alias='tablerecordname'  />
+                </link-entity>
+              </entity>            
             </fetch>        
         ";
 
@@ -77,7 +83,10 @@ namespace ROM.TSIS2.CSharpAPIDemo
               <entity name='ts_files_msdyn_workorders'>
                 <attribute name='msdyn_workorderid' />
                 <attribute name='ts_fileid' />
-              </entity>
+                <link-entity name='msdyn_workorder' to='msdyn_workorderid' from='msdyn_workorderid' alias='msdyn_workorder' link-type='inner'>
+                  <attribute name='msdyn_name' alias='tablerecordname' />
+                </link-entity>
+              </entity>            
             </fetch>        
         ";
 
@@ -86,7 +95,10 @@ namespace ROM.TSIS2.CSharpAPIDemo
               <entity name='ts_files_msdyn_workorderservicetasks'>
                 <attribute name='msdyn_workorderservicetaskid' />
                 <attribute name='ts_fileid' />
-              </entity>
+                <link-entity name='msdyn_workorderservicetask' to='msdyn_workorderservicetaskid' from='msdyn_workorderservicetaskid' alias='msdyn_workorderservicetask' link-type='inner'>
+                  <attribute name='msdyn_name' alias='tablerecordname' />
+                </link-entity>
+              </entity>            
             </fetch>        
         ";
 
@@ -95,7 +107,10 @@ namespace ROM.TSIS2.CSharpAPIDemo
               <entity name='ts_ovs_finding_ts_file'>
                 <attribute name='ovs_findingid' />
                 <attribute name='ts_fileid' />
-              </entity>
+                <link-entity name='ovs_finding' to='ovs_findingid' from='ovs_findingid' alias='ovs_finding' link-type='inner'>
+                  <attribute name='ovs_finding' alias='tablerecordname' />
+                </link-entity>
+              </entity>            
             </fetch>        
         ";
 
@@ -104,7 +119,10 @@ namespace ROM.TSIS2.CSharpAPIDemo
               <entity name='ts_files_msdyn_functionallocations'>
                 <attribute name='msdyn_functionallocationid' />
                 <attribute name='ts_fileid' />
-              </entity>
+                <link-entity name='msdyn_functionallocation' to='msdyn_functionallocationid' from='msdyn_functionallocationid' alias='msdyn_functionallocation' link-type='inner'>
+                  <attribute name='ts_functionallocationnameenglish' alias='tablerecordname' />
+                </link-entity>
+              </entity>            
             </fetch>        
         ";
 
@@ -113,6 +131,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
               <entity name='ts_files_ovs_operations'>
                 <attribute name='ovs_operationid' />
                 <attribute name='ts_fileid' />
+                <link-entity name='ovs_operation' to='ovs_operationid' from='ovs_operationid' alias='ovs_operation' link-type='inner'>
+                  <attribute name='ovs_name' alias='tablerecordname' />
+                </link-entity>
               </entity>
             </fetch>        
         ";
@@ -122,6 +143,27 @@ namespace ROM.TSIS2.CSharpAPIDemo
               <entity name='ts_files_accounts'>
                 <attribute name='accountid' />
                 <attribute name='ts_fileid' />
+                <link-entity name='account' to='accountid' from='accountid' alias='account' link-type='inner'>
+                  <attribute name='ovs_legalname' alias='tablerecordname' />
+                </link-entity>
+              </entity>
+            </fetch>        
+        ";
+
+        public const string All_Security_Incidents = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='ts_securityincident'>
+                <attribute name='ts_securityincidentid' />
+                <attribute name='ts_name' />
+              </entity>
+            </fetch>        
+        ";
+
+        public const string All_Exemptions = @"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+              <entity name='ts_exemption'>
+                <attribute name='ts_exemptionid' />
+                <attribute name='ts_name' />
               </entity>
             </fetch>        
         ";

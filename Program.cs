@@ -36,6 +36,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
         static List<FileItem>fileItems = new List<FileItem>();
         static List<FileItem>manyToManyFileItems = new List<FileItem>();
         static List<SharePointFileItem>sharePointFileItems = new List<SharePointFileItem>();
+        static List<SecurityIncident> securityIncidents = new List<SecurityIncident>();
+        static List<Exemption> exemptions = new List<Exemption>();
 
         public static string Case = "Case";
         public static string WorkOrder = "Work Order";
@@ -68,6 +70,40 @@ namespace ROM.TSIS2.CSharpAPIDemo
                 {
                     EntityCollection files = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Files));
 
+                    // Get all Security Incidents
+                    EntityCollection securityIncidents = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Security_Incidents));
+
+                    {
+                        foreach (var securityIncident in securityIncidents.Entities)
+                        {
+                            string securityIncidentId = securityIncident.Id.ToString();
+                            string securityIncidentName = securityIncident.GetAttributeValue<string> ("ts_name");
+
+                            Program.securityIncidents.Add(new SecurityIncident
+                            { 
+                                SecurityIncidentId = securityIncidentId,
+                                SecurityIncidentName = securityIncidentName
+                            });
+                        }
+                    }
+
+                    // Get all Exemptions
+                    EntityCollection exemptions = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Exemptions));
+
+                    {
+                        foreach (var exemption in exemptions.Entities)
+                        {
+                            string exemptionId = exemption.Id.ToString();
+                            string exemptionNumber = exemption.GetAttributeValue<string>("ts_name");
+
+                            Program.exemptions.Add(new Exemption
+                            {
+                                ExcemptionId = exemptionId,
+                                ExemptionNumber = exemptionNumber
+                            });
+                        }
+                    }
+
                     // get all individual file records
                     {
                         // put all the files in a list
@@ -78,6 +114,20 @@ namespace ROM.TSIS2.CSharpAPIDemo
                             bool? uploadedToSharePoint = file.GetAttributeValue<bool>("ts_uploadedtosharepoint");
                             Guid exemptionId = file.GetAttributeValue<EntityReference>("ts_exemption")?.Id ?? Guid.Empty;
                             Guid securityIncidentId = file.GetAttributeValue<EntityReference>("ts_securityincident")?.Id ?? Guid.Empty;
+                            string formIntegrationID = "";
+                            string tableRecordName = "";
+
+                            if (exemptionId != Guid.Empty)
+                            {
+                                formIntegrationID = exemptionId.ToString();
+                                tableRecordName = Program.exemptions.FirstOrDefault(x => x.ExcemptionId == formIntegrationID).ExemptionNumber;
+                            }
+
+                            if(securityIncidentId != Guid.Empty)
+                            {
+                                formIntegrationID = securityIncidentId.ToString();
+                                tableRecordName = Program.securityIncidents.FirstOrDefault(x => x.SecurityIncidentId == formIntegrationID).SecurityIncidentName;
+                            }
 
                             fileItems.Add(new FileItem
                             {
@@ -86,6 +136,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                 UploadedToSharePoint = uploadedToSharePoint,
                                 ExemptionId = exemptionId,
                                 SecurityIncidentId = securityIncidentId,
+                                FormIntegrationId = formIntegrationID,
+                                TableRecordName = tableRecordName
                             });
                         }
                     }
@@ -173,24 +225,43 @@ namespace ROM.TSIS2.CSharpAPIDemo
                             {
                                 // Get the table name
                                 string tableName = "";
+                                string tableNameFr = "";
 
                                 if (fileItemGroup.IdFieldName == "incidentid")
-                                    tableName = "Case";
+                                {
+                                    tableName = Case;
+                                    tableNameFr = CaseFr;
+                                }
 
                                 if (fileItemGroup.IdFieldName == "msdyn_workorderid")
-                                    tableName = "Work Order";
+                                {
+                                    tableName = WorkOrder;
+                                    tableNameFr = WorkOrderFr;
+                                }
 
                                 if (fileItemGroup.IdFieldName == "msdyn_workorderservicetaskid")
-                                    tableName = "Work Order Service Task";
+                                {
+                                    tableName = WorkOrderServiceTask;
+                                    tableNameFr = WorkOrderServiceTaskFr;
+                                }
 
                                 if (fileItemGroup.IdFieldName == "accountid")
-                                    tableName = "Stakeholder";
+                                {
+                                    tableName = Stakeholder;
+                                    tableNameFr = StakeholderFr;
+                                }
 
                                 if (fileItemGroup.IdFieldName == "msdyn_functionallocationid")
-                                    tableName = "Site";
+                                {
+                                    tableName = Site;
+                                    tableNameFr = SiteFr;
+                                }
 
                                 if (fileItemGroup.IdFieldName == "ovs_operationid")
-                                    tableName = "Operation";
+                                {
+                                    tableName = Operation;
+                                    tableNameFr = OperationFr;
+                                }
 
                                 // Some Output
                                 Console.WriteLine($"ID: {fileItem.FileId}");
@@ -215,7 +286,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                         SharePointFileId = sharePointFile.Id.ToString(),
                                         SharePointFileGroupId = sharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup")?.Id.ToString(),
                                         TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid"),
-                                        TableName = sharePointFile.GetAttributeValue<string>("ts_tablename")
+                                        TableName = sharePointFile.GetAttributeValue<string>("ts_tablename"),
+                                        TableNameFrench = sharePointFile.GetAttributeValue<string>("ts_tablenamefrench"),
+                                        TableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname")
                                     });
                                 }
                                 else
@@ -223,7 +296,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                     // Create the SharePoint File
                                     Entity newSharePointFile = new Entity("ts_sharepointfile");
                                     newSharePointFile.Attributes["ts_tablename"] = tableName;
+                                    newSharePointFile.Attributes["ts_tablenamefrench"] = tableNameFr;
                                     newSharePointFile.Attributes["ts_tablerecordid"] = fileItemGroup.Id.ToString();
+                                    newSharePointFile.Attributes["ts_tablerecordname"] = fileItem.TableRecordName;
 
                                     // Record the ID (GUID) of the new SharePoint File
                                     Guid createdSharePointFile = svc.Create(newSharePointFile);
@@ -238,7 +313,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                         SharePointFileId = sharePointFile.Id.ToString(),
                                         SharePointFileGroupId = sharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup")?.Id.ToString(),
                                         TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid"),
-                                        TableName = sharePointFile.GetAttributeValue<string>("ts_tablename")
+                                        TableName = sharePointFile.GetAttributeValue<string>("ts_tablename"),
+                                        TableNameFrench = sharePointFile.GetAttributeValue<string>("ts_tablenamefrench"),
+                                        TableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname")
                                     });
 
                                     //fileItem.TableRecordId = createdSharePointFile.ToString();
@@ -274,17 +351,20 @@ namespace ROM.TSIS2.CSharpAPIDemo
                         {
                             // Get the table name
                             string tableName = "";
+                            string tableNameFr = "";
                             string recordId = "";
 
                             if (fileItem.ExemptionId != Guid.Empty)
                             {
-                                tableName = "Exemption";
+                                tableName = Exemption;
+                                tableNameFr = ExemptionFr;
                                 recordId = fileItem.ExemptionId.ToString();
                             }
 
                             if (fileItem.SecurityIncidentId != Guid.Empty)
                             {
-                                tableName = "Security Incident";
+                                tableName = SecurityIncident;
+                                tableNameFr = SecurityIncidentFr;
                                 recordId = fileItem.SecurityIncidentId.ToString();
                             }
 
@@ -311,7 +391,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                     SharePointFileId = sharePointFile.Id.ToString(),
                                     SharePointFileGroupId = sharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup")?.Id.ToString(),
                                     TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid"),
-                                    TableName = sharePointFile.GetAttributeValue<string>("ts_tablename")
+                                    TableName = sharePointFile.GetAttributeValue<string>("ts_tablename"),
+                                    TableNameFrench = sharePointFile.GetAttributeValue<string>("ts_tablenamefrench"),
+                                    TableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname")
                                 });
                             }
                             else
@@ -319,7 +401,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                 // Create the SharePoint File
                                 Entity newSharePointFile = new Entity("ts_sharepointfile");
                                 newSharePointFile.Attributes["ts_tablename"] = tableName;
+                                newSharePointFile.Attributes["ts_tablenamefrench"] = tableNameFr;
                                 newSharePointFile.Attributes["ts_tablerecordid"] = recordId;
+                                newSharePointFile.Attributes["ts_tablerecordname"] = fileItem.TableRecordName;
 
                                 // Record the ID (GUID) of the new SharePoint File
                                 Guid createdSharePointFile = svc.Create(newSharePointFile);
@@ -334,7 +418,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                     SharePointFileId = sharePointFile.Id.ToString(),
                                     SharePointFileGroupId = sharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup")?.Id.ToString(),
                                     TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid"),
-                                    TableName = sharePointFile.GetAttributeValue<string>("ts_tablename")
+                                    TableName = sharePointFile.GetAttributeValue<string>("ts_tablename"),
+                                    TableNameFrench = sharePointFile.GetAttributeValue<string>("ts_tablenamefrench"),
+                                    TableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname")
                                 });
 
                                 //fileItem.TableRecordId = createdSharePointFile.ToString();
@@ -351,19 +437,19 @@ namespace ROM.TSIS2.CSharpAPIDemo
                     {
                         foreach (var sharePointFileItem in sharePointFileItems.OrderBy(x=> x.TableName))
                         {
-                            if (sharePointFileItem.TableName == "Case" ||
-                                sharePointFileItem.TableName == "Work Order" ||
-                                sharePointFileItem.TableName == "Work Order Service Task")
+                            if (sharePointFileItem.TableName == Case ||
+                                sharePointFileItem.TableName == WorkOrder ||
+                                sharePointFileItem.TableName == WorkOrderServiceTask)
                             {
                                 // Check if it's a Case
-                                if (sharePointFileItem.TableName == "Case")
+                                if (sharePointFileItem.TableName == Case)
                                 {
                                     // Create the SharePoint File Group
                                     var sharePointFileGroup = GetOrCreateSharePointFileGroup(svc, sharePointFileItem);
                                 }
 
                                 // Check if it's a Work Order
-                                if (sharePointFileItem.TableName == "Work Order")
+                                if (sharePointFileItem.TableName == WorkOrder)
                                 {
                                     // Does the Work Order Have a Case?
                                     var myWorkOrder = GetRecordFromTable(svc, sharePointFileItem.TableRecordId, "msdyn_workorder");
@@ -515,13 +601,15 @@ namespace ROM.TSIS2.CSharpAPIDemo
                 { "ovs_findingid", "FindingId" },
                 { "msdyn_functionallocationid", "SiteId" },
                 { "ovs_operationid", "OperationId" },
-                { "accountid", "StakeholderId" }            
+                { "accountid", "StakeholderId" },
+                { "tablerecordname", "TableRecordName" }
             };
 
             foreach (var file in files.Entities)
             {
                 string fileId = file.GetAttributeValue<Guid>("ts_fileid").ToString();
                 Guid recordId = file.GetAttributeValue<Guid>(entityIdAttribute);
+                string tableRecordName = file.GetAttributeValue<AliasedValue>("tablerecordname").Value?.ToString();
 
                 string propertyName = entityPropertyMap[entityIdAttribute];
 
@@ -529,7 +617,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
                 {
                     FileId = fileId,
                     IsManyToMany = true,
-                    FormIntegrationId = entityIdAttribute
+                    FormIntegrationId = entityIdAttribute,
+                    TableRecordName =  tableRecordName
                 });
 
                 // Use reflection to set the property dynamically based on entityIdAttribute
@@ -620,6 +709,7 @@ namespace ROM.TSIS2.CSharpAPIDemo
         public Guid SiteId { get; set; }
         public Guid StakeholderId { get; set; }
         public Guid WorkOrderServiceTaskId { get; set; }
+        public string TableRecordName { get; set; }
         public string TableRecordId { get; set; }
         public bool IsManyToMany { get; set; } = false;
         public string FormIntegrationId { get; set; }
@@ -638,6 +728,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
         public string SharePointFileGroupId { get; set; }
         public string TableRecordId { get; set; }
         public string TableName { get; set; }
+        public string TableNameFrench { get; set; }
+        public string TableRecordName { get; set; }
     }
 
     public class Case
@@ -657,5 +749,17 @@ namespace ROM.TSIS2.CSharpAPIDemo
     {
         public string WorkOrderServiceTaskId { get; set; }
         public string WorkOrderId { get; set; }
+    }
+
+    public class SecurityIncident
+    {
+        public string SecurityIncidentId { get; set; }
+        public string SecurityIncidentName { get; set; }
+    }
+
+    public class Exemption
+    {
+        public string ExcemptionId { get; set; }
+        public string ExemptionNumber { get; set; }
     }
 }
