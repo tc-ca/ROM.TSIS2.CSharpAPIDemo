@@ -105,6 +105,7 @@ namespace ROM.TSIS2.CSharpAPIDemo
                     }
 
                     // get all individual file records
+                    Console.WriteLine("Getting all individual file records.");
                     {
                         // put all the files in a list
                         foreach (var file in files.Entities)
@@ -143,6 +144,7 @@ namespace ROM.TSIS2.CSharpAPIDemo
                     }
 
                     // now get all the many-to-many records for file
+                    Console.WriteLine("Getting all the many-to-many file records.");
                     {
                         manyToManyFileItems.AddRange(GetFileItems(svc, FetchXMLExamples.All_Files_Cases, "incidentid", "ts_fileid"));
                         manyToManyFileItems.AddRange(GetFileItems(svc, FetchXMLExamples.All_Files_WorkOrders, "msdyn_workorderid", "ts_fileid"));
@@ -219,7 +221,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
                     // do the SharePoint File logic 
                     {
-                        foreach (var fileItem in fileItems.Where(x => x.UploadedToSharePoint == false && x.FileItemGroups.Count > 0))
+                        counter = 0;
+                        foreach (var fileItem in fileItems.Where(x => (x.UploadedToSharePoint == false || x.UploadedToSharePoint == null) && x.FileItemGroups.Count > 0))
                         {
                             foreach (var fileItemGroup in fileItem.FileItemGroups)
                             {
@@ -264,9 +267,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                 }
 
                                 // Some Output
-                                Console.WriteLine($"ID: {fileItem.FileId}");
-                                Console.WriteLine($"File Name: {fileItem.FileName}");
-                                Console.WriteLine($"{tableName}: {fileItemGroup.Id}");
+                                //Console.WriteLine($"ID: {fileItem.FileId}");
+                                //Console.WriteLine($"File Name: {fileItem.FileName}");
+                                //Console.WriteLine($"{tableName}: {fileItemGroup.Id}");
 
                                 // Define the columns you want to retrieve (null retrieves all columns)
                                 ColumnSet columns = new ColumnSet(true);
@@ -340,13 +343,14 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
                                 //    svc.Update(fileRecord);
                                 //}
-
-                                counter++;
-                                Console.WriteLine($"{counter} of {files.Entities.Count} completed");
-                                Console.WriteLine($"---------------------------------------------");
                             }
+
+                            counter++;
+                            Console.WriteLine($"SharePoint File {counter} of {fileItems.Count(x => (x.UploadedToSharePoint == false || x.UploadedToSharePoint == null) && x.FileItemGroups.Count > 0)} completed");
+                            Console.WriteLine($"---------------------------------------------");
                         }
 
+                        counter = 0;
                         foreach (var fileItem in fileItems.Where(x => x.UploadedToSharePoint == false && (x.ExemptionId != Guid.Empty || x.SecurityIncidentId != Guid.Empty)))
                         {
                             // Get the table name
@@ -369,9 +373,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                             }
 
                             // Some Output
-                            Console.WriteLine($"ID: {fileItem.FileId}");
-                            Console.WriteLine($"File Name: {fileItem.FileName}");
-                            Console.WriteLine($"{tableName}: {recordId}");
+                            //Console.WriteLine($"ID: {fileItem.FileId}");
+                            //Console.WriteLine($"File Name: {fileItem.FileName}");
+                            //Console.WriteLine($"{tableName}: {recordId}");
 
                             // Define the columns you want to retrieve (null retrieves all columns)
                             ColumnSet columns = new ColumnSet(true);
@@ -428,13 +432,14 @@ namespace ROM.TSIS2.CSharpAPIDemo
                             }
 
                             counter++;
-                            Console.WriteLine($"{counter} of {files.Entities.Count} completed");
+                            Console.WriteLine($"SharePoint File for Security Incident or Exemption {counter} of {fileItems.Count(x => x.UploadedToSharePoint == false && (x.ExemptionId != Guid.Empty || x.SecurityIncidentId != Guid.Empty))} completed");
                             Console.WriteLine($"---------------------------------------------");
                         }
                     }
 
                     // do the SharePoint File Group logic 
                     {
+                        counter = 0;
                         foreach (var sharePointFileItem in sharePointFileItems.OrderBy(x=> x.TableName))
                         {
                             if (sharePointFileItem.TableName == Case ||
@@ -465,6 +470,29 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                         //Get the SharePointFileGroup of the Case
                                         caseSharePointFileGroup = GetSingleRecordFromTableFetchXML(svc, FetchXMLExamples.SharePointFileGroupBySharePointFile(caseIdString));
 
+                                        //If the SharePoint File doesn't exist for the Case, create it
+                                        if (caseSharePointFileGroup == null)
+                                        {
+                                            Entity newSharePointFile = new Entity("ts_sharepointfile");
+
+                                            newSharePointFile.Attributes["ts_tablerecordid"] = caseIdString;
+                                            newSharePointFile.Attributes["ts_tablename"] = Case;
+                                            newSharePointFile.Attributes["ts_tablenamefrench"] = CaseFr;
+                                            newSharePointFile.Attributes["ts_tablerecordname"] = caseIdValue.Name;
+
+                                            Guid newSharePointFileID = svc.Create(newSharePointFile);
+
+                                            var caseSharePointFileItem = new SharePointFileItem {
+                                                SharePointFileId = newSharePointFileID.ToString(),
+                                                TableRecordId = caseIdString,
+                                                TableName = Case,
+                                                TableNameFrench = CaseFr,
+                                                TableRecordName = caseIdValue.Name
+                                            };
+
+                                            caseSharePointFileGroup = GetOrCreateSharePointFileGroup(svc, caseSharePointFileItem,false);
+                                        }
+
                                         //Set the SharePointFileGroupId of the SharePointFile for the Work Order
                                         sharePointFileItem.SharePointFileGroupId = caseSharePointFileGroup.GetAttributeValue<EntityReference>("ts_sharepointfilegroup").Id.ToString();
 
@@ -478,6 +506,59 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                     }
                                 }
 
+                                // Check if it's a Work Order Service Task
+                                if (sharePointFileItem.TableName == WorkOrderServiceTask)
+                                {
+                                    // Does the Work Order Service Task Have a Work Order?
+                                    var myWorkOrderServiceTask = GetRecordFromTable(svc, sharePointFileItem.TableRecordId, "msdyn_workorderservicetask");
+
+                                    var workOrderSharePointFileGroup = new Entity();
+
+                                    var workOrderIdValue = myWorkOrderServiceTask.GetAttributeValue<EntityReference>("msdyn_workorder");
+
+                                    if (myWorkOrderServiceTask != null && workOrderIdValue != null)
+                                    {
+                                        string workOrderIdString = workOrderIdValue.Id.ToString();
+
+                                        //Get the SharePointFileGroup of the WorkOrder
+                                        workOrderSharePointFileGroup = GetSingleRecordFromTableFetchXML(svc, FetchXMLExamples.SharePointFileGroupBySharePointFile(workOrderIdString));
+
+                                        //If the SharePoint File doesn't exist for the WorkOrder, create it
+                                        if (workOrderSharePointFileGroup == null)
+                                        {
+                                            Entity newSharePointFile = new Entity("ts_sharepointfile");
+
+                                            newSharePointFile.Attributes["ts_tablerecordid"] = workOrderIdString;
+                                            newSharePointFile.Attributes["ts_tablename"] = WorkOrder;
+                                            newSharePointFile.Attributes["ts_tablenamefrench"] = WorkOrderFr;
+                                            newSharePointFile.Attributes["ts_tablerecordname"] = workOrderIdValue.Name;
+
+                                            Guid newSharePointFileID = svc.Create(newSharePointFile);
+
+                                            var workOrderSharePointFileItem = new SharePointFileItem
+                                            {
+                                                SharePointFileId = newSharePointFileID.ToString(),
+                                                TableRecordId = workOrderIdString,
+                                                TableName = Case,
+                                                TableNameFrench = CaseFr,
+                                                TableRecordName = workOrderIdValue.Name
+                                            };
+
+                                            workOrderSharePointFileGroup = GetOrCreateSharePointFileGroup(svc, workOrderSharePointFileItem, false);
+                                        }
+
+                                        //Set the SharePointFileGroupId of the SharePointFile for the Work Order
+                                        sharePointFileItem.SharePointFileGroupId = workOrderSharePointFileGroup.GetAttributeValue<EntityReference>("ts_sharepointfilegroup").Id.ToString();
+
+                                        // Update the SharePointFile
+                                        GetOrCreateSharePointFileGroup(svc, sharePointFileItem, true);
+                                    }
+                                    else
+                                    {
+                                        // Give the Work Order Service Task it's own separate SharePointFileGroup
+                                        sharePointFileItem.SharePointFileGroupId = GetOrCreateSharePointFileGroup(svc, sharePointFileItem).Id.ToString();
+                                    }
+                                }
                             }
                             else
                             {
@@ -488,6 +569,10 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                     sharePointFileItem.SharePointFileGroupId = sharePointFileGroup.Id.ToString();
                                 }
                             }
+
+                            counter++;
+                            Console.WriteLine($"SharePoint File Group {counter} of {sharePointFileItems.Count()} completed");
+                            Console.WriteLine($"---------------------------------------------");
                         }
                     }
                 }
@@ -658,6 +743,10 @@ namespace ROM.TSIS2.CSharpAPIDemo
                     if (!usingExistingSharePointFileGroup)
                     {
                         sharePointFileGroupID = svc.Create(newSharePointFileGroup);
+
+                        // prevent an error by getting the new SharePoint File Group
+                        newSharePointFileGroup = svc.Retrieve("ts_sharepointfilegroup", sharePointFileGroupID, columns);
+
                     }
                     else
                     {
