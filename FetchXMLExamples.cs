@@ -8,7 +8,7 @@ namespace ROM.TSIS2.CSharpAPIDemo
 {
     public static class FetchXMLExamples
     {
-        public static string SharePointFileGroupBySharePointFile(string tableRecordId)
+        public static string SharePointFileByTableRecordId(string tableRecordId)
         {
             return $@"
                 <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
@@ -62,7 +62,18 @@ namespace ROM.TSIS2.CSharpAPIDemo
                 <attribute name='ts_stakeholder' />
                 <attribute name='ts_workorderservicetask' />
                 <attribute name='ts_formintegrationid' />
-              </entity>
+                <link-entity name='owner' to='ownerid' from='ownerid' alias='owner' link-type='inner'>
+                  <attribute name='name' alias='FileOwner' />
+                </link-entity>
+                <link-entity name='ts_filecategory' to='ts_filecategory' from='ts_filecategoryid' alias='ts_filecategory' link-type='outer'>
+                  <attribute name='ts_categoryen' />
+                  <attribute name='ts_categoryfr' />
+                </link-entity>
+                <link-entity name='ts_filesubcategory' to='ts_filesubcategory' from='ts_filesubcategoryid' alias='ts_filesubcategory' link-type='outer'>
+                  <attribute name='ts_filesubcategoryen' />
+                  <attribute name='ts_filesubcategoryfr' />
+                </link-entity>
+              </entity>            
             </fetch>
         ";
 
