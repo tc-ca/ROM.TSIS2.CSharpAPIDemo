@@ -116,6 +116,10 @@ namespace ROM.TSIS2.CSharpAPIDemo
                             Guid exemptionId = file.GetAttributeValue<EntityReference>("ts_exemption")?.Id ?? Guid.Empty;
                             Guid securityIncidentId = file.GetAttributeValue<EntityReference>("ts_securityincident")?.Id ?? Guid.Empty;
                             string fileOwner = file.GetAttributeValue<AliasedValue>("FileOwner").Value.ToString();
+                            string categoryEnglish = file.GetAttributeValue<AliasedValue>("CategoryEnglish")?.Value.ToString() ?? "";
+                            string categoryFrench = file.GetAttributeValue<AliasedValue>("CategoryFrench")?.Value.ToString() ?? "";
+                            string subCategoryEnglish = file.GetAttributeValue<AliasedValue>("SubCategoryEnglish")?.Value.ToString() ?? "";
+                            string subCategoryFrench = file.GetAttributeValue<AliasedValue>("SubCategoryFrench")?.Value.ToString() ?? "";
                             string formIntegrationID = "";
                             string tableRecordName = "";
 
@@ -141,6 +145,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                 FormIntegrationId = formIntegrationID,
                                 TableRecordName = tableRecordName,
                                 FileOwner = fileOwner,
+                                CategoryEnglish = categoryEnglish + " - " + subCategoryEnglish,
+                                CategoryFrench = categoryFrench + " - " + subCategoryFrench
                             });
                         }
                     }
@@ -311,12 +317,6 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                     newSharePointFile.Attributes["ts_tablerecordid"] = fileItemGroup.Id.ToString();
                                     newSharePointFile.Attributes["ts_tablerecordname"] = fileItemGroup.TableRecordName;
                                     newSharePointFile.Attributes["ts_tablerecordowner"] = fileItem.FileOwner;
-
-
-                                    if (fileItem.TableRecordId == "6800f8f1-ae8d-45ec-a338-0e384c865e82")
-                                    {
-                                        var test = "";
-                                    }
 
                                     // Record the ID (GUID) of the new SharePoint File
                                     Guid createdSharePointFile = svc.Create(newSharePointFile);
@@ -848,6 +848,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
         public string FormIntegrationId { get; set; }
         public List<FileItemGroup> FileItemGroups { get; set; } = new List<FileItemGroup>();
         public string FileOwner { get; set; }
+        public string CategoryEnglish { get; set; }
+        public string CategoryFrench { get; set; }
+        public string FileDescription { get; set; }
     }
 
     public class FileItemGroup

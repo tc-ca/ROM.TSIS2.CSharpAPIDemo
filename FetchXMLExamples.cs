@@ -66,12 +66,12 @@ namespace ROM.TSIS2.CSharpAPIDemo
                   <attribute name='name' alias='FileOwner' />
                 </link-entity>
                 <link-entity name='ts_filecategory' to='ts_filecategory' from='ts_filecategoryid' alias='ts_filecategory' link-type='outer'>
-                  <attribute name='ts_categoryen' />
-                  <attribute name='ts_categoryfr' />
+                  <attribute name='ts_categoryen' alias='CategoryEnglish' />
+                  <attribute name='ts_categoryfr' alias='CategoryFrench'  />
                 </link-entity>
                 <link-entity name='ts_filesubcategory' to='ts_filesubcategory' from='ts_filesubcategoryid' alias='ts_filesubcategory' link-type='outer'>
-                  <attribute name='ts_filesubcategoryen' />
-                  <attribute name='ts_filesubcategoryfr' />
+                  <attribute name='ts_filesubcategoryen' alias='SubCategoryEnglish' />
+                  <attribute name='ts_filesubcategoryfr' alias='SubCategoryFrench' />
                 </link-entity>
               </entity>            
             </fetch>
