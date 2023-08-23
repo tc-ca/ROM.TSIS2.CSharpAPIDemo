@@ -62,6 +62,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
                 <attribute name='ts_stakeholder' />
                 <attribute name='ts_workorderservicetask' />
                 <attribute name='ts_formintegrationid' />
+                <attribute name='ts_description' />
+                <attribute name='ts_attachment' />
                 <link-entity name='owner' to='ownerid' from='ownerid' alias='owner' link-type='inner'>
                   <attribute name='name' alias='FileOwner' />
                 </link-entity>

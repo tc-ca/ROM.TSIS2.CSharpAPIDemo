@@ -107,21 +107,37 @@ namespace ROM.TSIS2.CSharpAPIDemo
                     // get all individual file records
                     Console.WriteLine("Getting all individual file records.");
                     {
+                        // use this to make sure we get random numbers every time
+                        List<string> myRandomNumbers = new List<string>();
+                        Random random = new Random();
+
                         // put all the files in a list
                         foreach (var file in files.Entities)
                         {
+
+                            string randomNumber;
+
+                            do
+                            {
+                                randomNumber = random.Next(10000, 99999).ToString();
+                            } while (myRandomNumbers.Any(x => x == randomNumber));
+
+                            myRandomNumbers.Add(randomNumber);
+
                             string fileId = file.GetAttributeValue<Guid>("ts_fileid").ToString();
-                            string fileName = DateTime.UtcNow.ToString("yyyyMMddHHmmssffff") + " " + file.GetAttributeValue<String>("ts_file");
+                            string fileName = randomNumber + DateTime.UtcNow.ToString("yyyyMMddHHmmssffff") + " " + file.GetAttributeValue<String>("ts_file");
                             bool? uploadedToSharePoint = file.GetAttributeValue<bool>("ts_uploadedtosharepoint");
                             Guid exemptionId = file.GetAttributeValue<EntityReference>("ts_exemption")?.Id ?? Guid.Empty;
                             Guid securityIncidentId = file.GetAttributeValue<EntityReference>("ts_securityincident")?.Id ?? Guid.Empty;
                             string fileOwner = file.GetAttributeValue<AliasedValue>("FileOwner").Value.ToString();
                             string categoryEnglish = file.GetAttributeValue<AliasedValue>("CategoryEnglish")?.Value.ToString() ?? "";
                             string categoryFrench = file.GetAttributeValue<AliasedValue>("CategoryFrench")?.Value.ToString() ?? "";
-                            string subCategoryEnglish = file.GetAttributeValue<AliasedValue>("SubCategoryEnglish")?.Value.ToString() ?? "";
-                            string subCategoryFrench = file.GetAttributeValue<AliasedValue>("SubCategoryFrench")?.Value.ToString() ?? "";
+                            string subCategoryEnglish = file.GetAttributeValue<AliasedValue>("SubCategoryEnglish")?.Value.ToString() ?? "Other";
+                            string subCategoryFrench = file.GetAttributeValue<AliasedValue>("SubCategoryFrench")?.Value.ToString() ?? "Autre";
+                            string fileDescription = file.GetAttributeValue<string>("ts_description")?.ToString() ?? "";
                             string formIntegrationID = "";
                             string tableRecordName = "";
+                            string attachment = file.GetAttributeValue<Guid>("ts_attachment").ToString() ?? "";
 
                             if (exemptionId != Guid.Empty)
                             {
@@ -146,7 +162,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                 TableRecordName = tableRecordName,
                                 FileOwner = fileOwner,
                                 CategoryEnglish = categoryEnglish + " - " + subCategoryEnglish,
-                                CategoryFrench = categoryFrench + " - " + subCategoryFrench
+                                CategoryFrench = categoryFrench + " - " + subCategoryFrench,
+                                FileDescription = fileDescription,
+                                Attachment = attachment
                             });
                         }
                     }
@@ -298,6 +316,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                 {
                                     fileItem.TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid");
 
+                                    fileItem.SharePointFileId = sharePointFile.Id.ToString();
+
                                     sharePointFileItems.Add(new SharePointFileItem
                                     {
                                         SharePointFileId = sharePointFile.Id.ToString(),
@@ -325,6 +345,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
                                     sharePointFile = sharePointFiles.Entities.Count > 0 ? sharePointFiles.Entities[0] : null;
 
+                                    fileItem.SharePointFileId = sharePointFile.Id.ToString();
+
                                     // Add the SharePoint File to the list
                                     sharePointFileItems.Add(new SharePointFileItem
                                     {
@@ -339,25 +361,6 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                     //fileItem.TableRecordId = createdSharePointFile.ToString();
                                     fileItem.TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid");
                                 }
-
-                                //// Upload Attachment
-                                //Task<bool> uploadTask = Task.Run(async () => await UploadAttachmentPowerAutomate(fileItem.FileId, fileItem.TableRecordId, fileItem.FileName));
-
-                                //await Task.WhenAll(uploadTask);
-
-                                //// If we have uploaded the file successfully, update the File
-                                //if (uploadTask.Result)
-                                //{
-                                //    columns = new ColumnSet(true);
-
-                                //    Guid fileGuid = new Guid(fileItem.FileId);
-
-                                //    Entity fileRecord = svc.Retrieve("ts_file", fileGuid, columns);
-
-                                //    fileRecord.Attributes["ts_uploadedtosharepoint"] = true;
-
-                                //    svc.Update(fileRecord);
-                                //}
                             }
 
                             counter++;
@@ -406,6 +409,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
                             {
                                 fileItem.TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid");
 
+                                fileItem.SharePointFileId = sharePointFile.Id.ToString();
+
                                 sharePointFileItems.Add(new SharePointFileItem
                                 {
                                     SharePointFileId = sharePointFile.Id.ToString(),
@@ -432,6 +437,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                 sharePointFiles = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.Single_SharePointFile(recordId)));
 
                                 sharePointFile = sharePointFiles.Entities.Count > 0 ? sharePointFiles.Entities[0] : null;
+
+                                fileItem.SharePointFileId = sharePointFile.Id.ToString();
 
                                 // Add the SharePoint File to the list
                                 sharePointFileItems.Add(new SharePointFileItem
@@ -620,6 +627,38 @@ namespace ROM.TSIS2.CSharpAPIDemo
                             Console.WriteLine($"---------------------------------------------");
                         }
                     }
+
+                    // Upload all the files to SharePoint
+                    {
+                        int fileCounter = 0;
+
+                        foreach (var fileItem in fileItems.Where(x => x.UploadedToSharePoint == false && 
+                        x.SharePointFileId != null && 
+                        x.FileOwner.Contains("Intermodal Surface Security Oversight (ISSO)") &&
+                        x.Attachment != "00000000-0000-0000-0000-000000000000"))
+                        {
+                            // Upload Attachment
+                            Task<bool> uploadTask = UploadAttachmentPowerAutomateAsync(fileItem,fileCounter);
+
+                            await Task.WhenAll(uploadTask);
+
+                            // If we have uploaded the file successfully, update the File
+                            if (uploadTask.Result)
+                            {
+                                ColumnSet columns = new ColumnSet(true);
+
+                                Guid fileGuid = new Guid(fileItem.FileId);
+
+                                Entity fileRecord = svc.Retrieve("ts_file", fileGuid, columns);
+
+                                fileRecord.Attributes["ts_uploadedtosharepoint"] = true;
+
+                                svc.Update(fileRecord);
+                            }
+
+                            fileCounter++;
+                        }
+                    }
                 }
             }
 
@@ -671,7 +710,7 @@ namespace ROM.TSIS2.CSharpAPIDemo
             }
         }
 
-        private static async Task<bool> UploadAttachmentPowerAutomate(string fileId, string sharePointFileGroup, string fileName)
+        private static async Task<bool> UploadAttachmentPowerAutomateAsync(FileItem fileItem, int count)
         {
             string flowEndpointUrl = "https://prod-08.canadacentral.logic.azure.com:443/workflows/5770469a718943aea1e4d87b9ec3c769/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=151Hbu33fqLvsCHsvQesCSMLHNreNezie9sOhAERvWE"; // Replace with your actual flow endpoint URL
 
@@ -683,19 +722,28 @@ namespace ROM.TSIS2.CSharpAPIDemo
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, client.BaseAddress);
 
             // Serialize the byte array to a JSON string and convert it to Base64
-            string jsonPayload = JsonConvert.SerializeObject(new { ts_fileid = fileId, ts_sharepointfileid = sharePointFileGroup, FileName= fileName });
+            string jsonPayload = JsonConvert.SerializeObject(new { 
+                ts_fileid = fileItem.FileId, 
+                ts_sharepointfileid = fileItem.SharePointFileId, 
+                FileName = fileItem.FileName,
+                CategoryEnglish = fileItem.CategoryEnglish,
+                CategoryFrench = fileItem.CategoryFrench,
+                FileDescription = fileItem.FileDescription,
+                FileOwner = fileItem.FileOwner
+            });
 
             var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
             request.Content = content;
             var response = await MakeRequestAsync(request, client);
-            Console.WriteLine(response);
 
             if (response == "File uploaded to SharePoint")
             {
+                Console.WriteLine($"Number {count} File: {fileItem.FileName} -  {response}");
                 return true;
             }
             else
             {
+                Console.WriteLine($"Number {count} File: {fileItem.FileName} -  Was not uploaded due to an error");
                 return false;
             }
         }
@@ -851,6 +899,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
         public string CategoryEnglish { get; set; }
         public string CategoryFrench { get; set; }
         public string FileDescription { get; set; }
+        public string SharePointFileId { get; set; }
+        public string Attachment { get; set; }
     }
 
     public class FileItemGroup
