@@ -17,6 +17,10 @@ using System.Security;
 using System.Linq;
 using System.Collections.Generic;
 using System.Text;
+using Microsoft.SharePoint.Client.Search.Query;
+using Microsoft.Crm.Sdk.Messages;
+using Microsoft.SharePoint.Client.RecordsRepository;
+using System.Text.RegularExpressions;
 
 namespace ROM.TSIS2.CSharpAPIDemo
 {
@@ -68,10 +72,13 @@ namespace ROM.TSIS2.CSharpAPIDemo
             {
                 // Get all the files
                 {
-                    EntityCollection files = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Files));
+                    //EntityCollection files = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Files));
+                    EntityCollection files = RetrieveAllRecordsUsingPaging(svc, new FetchExpression(FetchXMLExamples.All_Files));
+
 
                     // Get all Security Incidents
-                    EntityCollection securityIncidents = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Security_Incidents));
+                    //EntityCollection securityIncidents = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Security_Incidents));
+                    EntityCollection securityIncidents = RetrieveAllRecordsUsingPaging(svc, new FetchExpression(FetchXMLExamples.All_Security_Incidents));
 
                     {
                         foreach (var securityIncident in securityIncidents.Entities)
@@ -88,7 +95,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
                     }
 
                     // Get all Exemptions
-                    EntityCollection exemptions = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Exemptions));
+                    //EntityCollection exemptions = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.All_Exemptions));
+                    EntityCollection exemptions = RetrieveAllRecordsUsingPaging(svc, new FetchExpression(FetchXMLExamples.All_Exemptions));
 
                     {
                         foreach (var exemption in exemptions.Entities)
@@ -133,7 +141,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                             string categoryEnglish = file.GetAttributeValue<AliasedValue>("CategoryEnglish")?.Value.ToString() ?? "";
                             string categoryFrench = file.GetAttributeValue<AliasedValue>("CategoryFrench")?.Value.ToString() ?? "";
                             string subCategoryEnglish = file.GetAttributeValue<AliasedValue>("SubCategoryEnglish")?.Value.ToString() ?? "Other";
+                            subCategoryEnglish = string.IsNullOrWhiteSpace(subCategoryEnglish) ? "Other" : subCategoryEnglish;
                             string subCategoryFrench = file.GetAttributeValue<AliasedValue>("SubCategoryFrench")?.Value.ToString() ?? "Autre";
+                            subCategoryFrench = string.IsNullOrWhiteSpace(subCategoryFrench) ? "Autre" : subCategoryFrench;
                             string fileDescription = file.GetAttributeValue<string>("ts_description")?.ToString() ?? "";
                             string formIntegrationID = "";
                             string tableRecordName = "";
@@ -253,6 +263,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
                     // do the SharePoint File logic 
                     {
+                        // get all the ts_sharepointfile records that have already been created
+                        EntityCollection sharePointFiles = RetrieveAllRecordsUsingPaging(svc, new FetchExpression(FetchXMLExamples.All_Existing_SharePointFiles));
+
                         counter = 0;
                         foreach (var fileItem in fileItems.Where(x => (x.UploadedToSharePoint == false || x.UploadedToSharePoint == null) && x.FileItemGroups.Count > 0))
                         {
@@ -308,9 +321,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
                                 Entity sharePointFile = null;
 
-                                EntityCollection sharePointFiles = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.Single_SharePointFile(fileItemGroup.Id.ToString())));
-
-                                sharePointFile = sharePointFiles.Entities.Count > 0 ? sharePointFiles.Entities[0] : null;
+                                // find out if the ts_sharepointfile already exists
+                                sharePointFile = CheckIfSharePointFileExists(fileItemGroup, svc, sharePointFile, sharePointFiles,"");
 
                                 if (sharePointFile != null)
                                 {
@@ -327,46 +339,58 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                         TableNameFrench = sharePointFile.GetAttributeValue<string>("ts_tablenamefrench"),
                                         TableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname")
                                     });
+
+                                    fileItem.SharePointTableName = sharePointFile.GetAttributeValue<string>("ts_tablename") + " - " + sharePointFile.GetAttributeValue<string>("ts_tablenamefrench");
+                                    fileItem.SharePointTableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname");
                                 }
                                 else
                                 {
-                                    // Create the SharePoint File
-                                    Entity newSharePointFile = new Entity("ts_sharepointfile");
-                                    newSharePointFile.Attributes["ts_tablename"] = tableName;
-                                    newSharePointFile.Attributes["ts_tablenamefrench"] = tableNameFr;
-                                    newSharePointFile.Attributes["ts_tablerecordid"] = fileItemGroup.Id.ToString();
-                                    newSharePointFile.Attributes["ts_tablerecordname"] = fileItemGroup.TableRecordName;
-                                    newSharePointFile.Attributes["ts_tablerecordowner"] = fileItem.FileOwner;
+                                    bool fileOwnerValid = true;
 
-                                    // Record the ID (GUID) of the new SharePoint File
-                                    Guid createdSharePointFile = svc.Create(newSharePointFile);
+                                    IsOwnerValid(fileItem, ref fileOwnerValid);
 
-                                    sharePointFiles = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.Single_SharePointFile(fileItemGroup.Id.ToString())));
-
-                                    sharePointFile = sharePointFiles.Entities.Count > 0 ? sharePointFiles.Entities[0] : null;
-
-                                    fileItem.SharePointFileId = sharePointFile.Id.ToString();
-
-                                    // Add the SharePoint File to the list
-                                    sharePointFileItems.Add(new SharePointFileItem
+                                    if (fileOwnerValid)
                                     {
-                                        SharePointFileId = sharePointFile.Id.ToString(),
-                                        SharePointFileGroupId = sharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup")?.Id.ToString(),
-                                        TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid"),
-                                        TableName = sharePointFile.GetAttributeValue<string>("ts_tablename"),
-                                        TableNameFrench = sharePointFile.GetAttributeValue<string>("ts_tablenamefrench"),
-                                        TableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname")
-                                    });
+                                        // Create the SharePoint File
+                                        Entity newSharePointFile = new Entity("ts_sharepointfile");
+                                        newSharePointFile.Attributes["ts_tablename"] = tableName;
+                                        newSharePointFile.Attributes["ts_tablenamefrench"] = tableNameFr;
+                                        newSharePointFile.Attributes["ts_tablerecordid"] = fileItemGroup.Id.ToString();
+                                        newSharePointFile.Attributes["ts_tablerecordname"] = fileItemGroup.TableRecordName;
+                                        newSharePointFile.Attributes["ts_tablerecordowner"] = fileItem.FileOwner;
 
-                                    //fileItem.TableRecordId = createdSharePointFile.ToString();
-                                    fileItem.TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid");
+                                        // Record the ID (GUID) of the new SharePoint File
+                                        Guid createdSharePointFile = svc.Create(newSharePointFile);
+
+                                        sharePointFiles = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.Single_SharePointFile(fileItemGroup.Id.ToString())));
+
+                                        sharePointFile = sharePointFiles.Entities.Count > 0 ? sharePointFiles.Entities[0] : null;
+
+                                        fileItem.SharePointFileId = sharePointFile.Id.ToString();
+
+                                        // Add the SharePoint File to the list
+                                        sharePointFileItems.Add(new SharePointFileItem
+                                        {
+                                            SharePointFileId = sharePointFile.Id.ToString(),
+                                            SharePointFileGroupId = sharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup")?.Id.ToString(),
+                                            TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid"),
+                                            TableName = sharePointFile.GetAttributeValue<string>("ts_tablename"),
+                                            TableNameFrench = sharePointFile.GetAttributeValue<string>("ts_tablenamefrench"),
+                                            TableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname")
+                                        });
+
+                                        //fileItem.TableRecordId = createdSharePointFile.ToString();
+                                        fileItem.TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid");
+                                        fileItem.SharePointTableName = sharePointFile.GetAttributeValue<string>("ts_tablename") + " - " + sharePointFile.GetAttributeValue<string>("ts_tablenamefrench");
+                                        fileItem.SharePointTableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname");
+                                    }
                                 }
                             }
 
                             counter++;
                             Console.WriteLine($"SharePoint File {counter} of {fileItems.Count(x => (x.UploadedToSharePoint == false || x.UploadedToSharePoint == null) && x.FileItemGroups.Count > 0)} completed");
                             Console.WriteLine($"---------------------------------------------");
-                            Console.Clear();
+                            //Console.Clear();
                         }
 
                         counter = 0;
@@ -401,9 +425,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
                             Entity sharePointFile = null;
 
-                            EntityCollection sharePointFiles = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.Single_SharePointFile(recordId)));
-
-                            sharePointFile = sharePointFiles.Entities.Count > 0 ? sharePointFiles.Entities[0] : null;
+                            // find out if the ts_sharepointfile already exists
+                            sharePointFile = CheckIfSharePointFileExists(null, svc, sharePointFile, sharePointFiles,recordId);
 
                             if (sharePointFile != null)
                             {
@@ -420,243 +443,267 @@ namespace ROM.TSIS2.CSharpAPIDemo
                                     TableNameFrench = sharePointFile.GetAttributeValue<string>("ts_tablenamefrench"),
                                     TableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname")
                                 });
+
+                                fileItem.SharePointTableName = sharePointFile.GetAttributeValue<string>("ts_tablename") + " - " + sharePointFile.GetAttributeValue<string>("ts_tablenamefrench");
+                                fileItem.SharePointTableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname");
+
                             }
                             else
                             {
-                                // Create the SharePoint File
-                                Entity newSharePointFile = new Entity("ts_sharepointfile");
-                                newSharePointFile.Attributes["ts_tablename"] = tableName;
-                                newSharePointFile.Attributes["ts_tablenamefrench"] = tableNameFr;
-                                newSharePointFile.Attributes["ts_tablerecordid"] = recordId;
-                                newSharePointFile.Attributes["ts_tablerecordname"] = fileItem.TableRecordName;
-                                newSharePointFile.Attributes["ts_tablerecordowner"] = fileItem.FileOwner;
+                                bool fileOwnerValid = true;
+                                IsOwnerValid(fileItem, ref fileOwnerValid);
 
-                                // Record the ID (GUID) of the new SharePoint File
-                                Guid createdSharePointFile = svc.Create(newSharePointFile);
-
-                                sharePointFiles = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.Single_SharePointFile(recordId)));
-
-                                sharePointFile = sharePointFiles.Entities.Count > 0 ? sharePointFiles.Entities[0] : null;
-
-                                fileItem.SharePointFileId = sharePointFile.Id.ToString();
-
-                                // Add the SharePoint File to the list
-                                sharePointFileItems.Add(new SharePointFileItem
+                                if (fileOwnerValid)
                                 {
-                                    SharePointFileId = sharePointFile.Id.ToString(),
-                                    SharePointFileGroupId = sharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup")?.Id.ToString(),
-                                    TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid"),
-                                    TableName = sharePointFile.GetAttributeValue<string>("ts_tablename"),
-                                    TableNameFrench = sharePointFile.GetAttributeValue<string>("ts_tablenamefrench"),
-                                    TableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname")
-                                });
+                                    // Create the SharePoint File
+                                    Entity newSharePointFile = new Entity("ts_sharepointfile");
+                                    newSharePointFile.Attributes["ts_tablename"] = tableName;
+                                    newSharePointFile.Attributes["ts_tablenamefrench"] = tableNameFr;
+                                    newSharePointFile.Attributes["ts_tablerecordid"] = recordId;
+                                    newSharePointFile.Attributes["ts_tablerecordname"] = fileItem.TableRecordName;
+                                    newSharePointFile.Attributes["ts_tablerecordowner"] = fileItem.FileOwner;
 
-                                //fileItem.TableRecordId = createdSharePointFile.ToString();
-                                fileItem.TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid");
+                                    // Record the ID (GUID) of the new SharePoint File
+                                    Guid createdSharePointFile = svc.Create(newSharePointFile);
+
+                                    sharePointFiles = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.Single_SharePointFile(recordId)));
+
+                                    sharePointFile = sharePointFiles.Entities.Count > 0 ? sharePointFiles.Entities[0] : null;
+
+                                    fileItem.SharePointFileId = sharePointFile.Id.ToString();
+
+                                    // Add the SharePoint File to the list
+                                    sharePointFileItems.Add(new SharePointFileItem
+                                    {
+                                        SharePointFileId = sharePointFile.Id.ToString(),
+                                        SharePointFileGroupId = sharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup")?.Id.ToString(),
+                                        TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid"),
+                                        TableName = sharePointFile.GetAttributeValue<string>("ts_tablename"),
+                                        TableNameFrench = sharePointFile.GetAttributeValue<string>("ts_tablenamefrench"),
+                                        TableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname")
+                                    });
+
+                                    //fileItem.TableRecordId = createdSharePointFile.ToString();
+                                    fileItem.TableRecordId = sharePointFile.GetAttributeValue<string>("ts_tablerecordid");
+
+                                    fileItem.SharePointTableName = sharePointFile.GetAttributeValue<string>("ts_tablename") + " - " + sharePointFile.GetAttributeValue<string>("ts_tablenamefrench");
+                                    fileItem.SharePointTableRecordName = sharePointFile.GetAttributeValue<string>("ts_tablerecordname");
+
+                                }
+
                             }
 
                             counter++;
                             Console.WriteLine($"SharePoint File for Security Incident or Exemption {counter} of {fileItems.Count(x => x.UploadedToSharePoint == false && (x.ExemptionId != Guid.Empty || x.SecurityIncidentId != Guid.Empty))} completed");
                             Console.WriteLine($"---------------------------------------------");
-                            Console.Clear();
+                           // Console.Clear();
                         }
                     }
 
                     // do the SharePoint File Group logic 
-                    {
-                        counter = 0;
-                        foreach (var sharePointFileItem in sharePointFileItems.OrderBy(x=> x.TableName))
-                        {
-                            if (sharePointFileItem.TableName == Case ||
-                                sharePointFileItem.TableName == WorkOrder ||
-                                sharePointFileItem.TableName == WorkOrderServiceTask)
-                            {
-                                // Check if it's a Case
-                                if (sharePointFileItem.TableName == Case)
-                                {
-                                    // Create the SharePoint File Group
-                                    var sharePointFileGroup = GetOrCreateSharePointFileGroup(svc, sharePointFileItem);
-                                }
+                    //{
+                    //    counter = 0;
+                    //    foreach (var sharePointFileItem in sharePointFileItems.OrderBy(x=> x.TableName))
+                    //    {
+                    //        if (sharePointFileItem.TableName == Case ||
+                    //            sharePointFileItem.TableName == WorkOrder ||
+                    //            sharePointFileItem.TableName == WorkOrderServiceTask)
+                    //        {
+                    //            // Check if it's a Case
+                    //            if (sharePointFileItem.TableName == Case)
+                    //            {
+                    //                // Create the SharePoint File Group
+                    //                var sharePointFileGroup = GetOrCreateSharePointFileGroup(svc, sharePointFileItem);
+                    //            }
 
-                                // Check if it's a Work Order
-                                if (sharePointFileItem.TableName == WorkOrder)
-                                {
-                                    // Does the Work Order Have a Case?
-                                    var myWorkOrder = GetRecordFromTable(svc, sharePointFileItem.TableRecordId, "msdyn_workorder");
+                    //            // Check if it's a Work Order
+                    //            if (sharePointFileItem.TableName == WorkOrder)
+                    //            {
+                    //                // Does the Work Order Have a Case?
+                    //                var myWorkOrder = GetRecordFromTable(svc, sharePointFileItem.TableRecordId, "msdyn_workorder");
 
-                                    var caseSharePointFile = new Entity();
+                    //                var caseSharePointFile = new Entity();
 
-                                    // Get the Case ID from the Work Order
-                                    var caseIdValue = myWorkOrder.GetAttributeValue<EntityReference>("msdyn_servicerequest");
+                    //                // Get the Case ID from the Work Order
+                    //                var caseIdValue = myWorkOrder.GetAttributeValue<EntityReference>("msdyn_servicerequest");
 
-                                    if (myWorkOrder!= null && caseIdValue != null)
-                                    {
-                                        string caseIdString = caseIdValue.Id.ToString();
+                    //                if (myWorkOrder!= null && caseIdValue != null)
+                    //                {
+                    //                    string caseIdString = caseIdValue.Id.ToString();
 
-                                        //Get the SharePointFile of the Case
-                                        caseSharePointFile = GetSingleRecordFromTableFetchXML(svc, FetchXMLExamples.SharePointFileByTableRecordId(caseIdString));
+                    //                    //Get the SharePointFile of the Case
+                    //                    caseSharePointFile = GetSingleRecordFromTableFetchXML(svc, FetchXMLExamples.SharePointFileByTableRecordId(caseIdString));
 
-                                        //If the SharePoint File doesn't exist for the Case, create it
-                                        if (caseSharePointFile == null)
-                                        {
-                                            Entity newSharePointFile = new Entity("ts_sharepointfile");
+                    //                    //If the SharePoint File doesn't exist for the Case, create it
+                    //                    if (caseSharePointFile == null)
+                    //                    {
+                    //                        Entity newSharePointFile = new Entity("ts_sharepointfile");
 
-                                            newSharePointFile.Attributes["ts_tablerecordid"] = caseIdString;
-                                            newSharePointFile.Attributes["ts_tablename"] = Case;
-                                            newSharePointFile.Attributes["ts_tablenamefrench"] = CaseFr;
-                                            newSharePointFile.Attributes["ts_tablerecordname"] = caseIdValue.Name;
-                                            newSharePointFile.Attributes["ts_tablerecordowner"] = sharePointFileItem.TableRecordOwner;
+                    //                        newSharePointFile.Attributes["ts_tablerecordid"] = caseIdString;
+                    //                        newSharePointFile.Attributes["ts_tablename"] = Case;
+                    //                        newSharePointFile.Attributes["ts_tablenamefrench"] = CaseFr;
+                    //                        newSharePointFile.Attributes["ts_tablerecordname"] = caseIdValue.Name;
+                    //                        newSharePointFile.Attributes["ts_tablerecordowner"] = sharePointFileItem.TableRecordOwner;
 
-                                            Guid newSharePointFileID = svc.Create(newSharePointFile);
+                    //                        Guid newSharePointFileID = svc.Create(newSharePointFile);
 
-                                            var caseSharePointFileItem = new SharePointFileItem {
-                                                SharePointFileId = newSharePointFileID.ToString(),
-                                                TableRecordId = caseIdString,
-                                                TableName = Case,
-                                                TableNameFrench = CaseFr,
-                                                TableRecordName = caseIdValue.Name
-                                            };
+                    //                        var caseSharePointFileItem = new SharePointFileItem {
+                    //                            SharePointFileId = newSharePointFileID.ToString(),
+                    //                            TableRecordId = caseIdString,
+                    //                            TableName = Case,
+                    //                            TableNameFrench = CaseFr,
+                    //                            TableRecordName = caseIdValue.Name
+                    //                        };
 
-                                            caseSharePointFile = GetOrCreateSharePointFileGroup(svc, caseSharePointFileItem,false);
-                                        }
+                    //                        caseSharePointFile = GetOrCreateSharePointFileGroup(svc, caseSharePointFileItem,false);
+                    //                    }
 
-                                        string sharePointFileGroupId = "";
+                    //                    string sharePointFileGroupId = "";
 
-                                        // This is here because it can return a sharePointFile or sharePointFileGroup - sorry...
-                                        if (caseSharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup") == null)
-                                        {
-                                            sharePointFileGroupId = caseSharePointFile.Id.ToString();
-                                        }
-                                        else
-                                        {
-                                            sharePointFileGroupId = caseSharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup").Id.ToString();
-                                        }
+                    //                    // This is here because it can return a sharePointFile or sharePointFileGroup - sorry...
+                    //                    if (caseSharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup") == null)
+                    //                    {
+                    //                        sharePointFileGroupId = caseSharePointFile.Id.ToString();
+                    //                    }
+                    //                    else
+                    //                    {
+                    //                        sharePointFileGroupId = caseSharePointFile.GetAttributeValue<EntityReference>("ts_sharepointfilegroup").Id.ToString();
+                    //                    }
 
-                                        //Set the SharePointFileGroupId of the SharePointFile for the Work Order
-                                        sharePointFileItem.SharePointFileGroupId = sharePointFileGroupId;
+                    //                    //Set the SharePointFileGroupId of the SharePointFile for the Work Order
+                    //                    sharePointFileItem.SharePointFileGroupId = sharePointFileGroupId;
 
-                                        // Update the SharePointFile
-                                        GetOrCreateSharePointFileGroup(svc, sharePointFileItem,true);
-                                    }
-                                    else
-                                    {
-                                        // Give the Work Order it's own separate SharePointFileGroup
-                                        sharePointFileItem.SharePointFileGroupId = GetOrCreateSharePointFileGroup(svc, sharePointFileItem).Id.ToString();
-                                    }
-                                }
+                    //                    // Update the SharePointFile
+                    //                    GetOrCreateSharePointFileGroup(svc, sharePointFileItem,true);
+                    //                }
+                    //                else
+                    //                {
+                    //                    // Give the Work Order it's own separate SharePointFileGroup
+                    //                    sharePointFileItem.SharePointFileGroupId = GetOrCreateSharePointFileGroup(svc, sharePointFileItem).Id.ToString();
+                    //                }
+                    //            }
 
-                                // Check if it's a Work Order Service Task
-                                if (sharePointFileItem.TableName == WorkOrderServiceTask)
-                                {
-                                    // Does the Work Order Service Task Have a Work Order?
-                                    var myWorkOrderServiceTask = GetRecordFromTable(svc, sharePointFileItem.TableRecordId, "msdyn_workorderservicetask");
+                    //            // Check if it's a Work Order Service Task
+                    //            if (sharePointFileItem.TableName == WorkOrderServiceTask)
+                    //            {
+                    //                // Does the Work Order Service Task Have a Work Order?
+                    //                var myWorkOrderServiceTask = GetRecordFromTable(svc, sharePointFileItem.TableRecordId, "msdyn_workorderservicetask");
 
-                                    var workOrderSharePointFileGroup = new Entity();
+                    //                var workOrderSharePointFileGroup = new Entity();
 
-                                    var workOrderIdValue = myWorkOrderServiceTask.GetAttributeValue<EntityReference>("msdyn_workorder");
+                    //                var workOrderIdValue = myWorkOrderServiceTask.GetAttributeValue<EntityReference>("msdyn_workorder");
 
-                                    if (myWorkOrderServiceTask != null && workOrderIdValue != null)
-                                    {
-                                        string workOrderIdString = workOrderIdValue.Id.ToString();
+                    //                if (myWorkOrderServiceTask != null && workOrderIdValue != null)
+                    //                {
+                    //                    string workOrderIdString = workOrderIdValue.Id.ToString();
 
-                                        //Get the SharePointFileGroup of the WorkOrder
-                                        workOrderSharePointFileGroup = GetSingleRecordFromTableFetchXML(svc, FetchXMLExamples.SharePointFileByTableRecordId(workOrderIdString));
+                    //                    //Get the SharePointFileGroup of the WorkOrder
+                    //                    workOrderSharePointFileGroup = GetSingleRecordFromTableFetchXML(svc, FetchXMLExamples.SharePointFileByTableRecordId(workOrderIdString));
 
-                                        //If the SharePoint File doesn't exist for the WorkOrder, create it
-                                        if (workOrderSharePointFileGroup == null)
-                                        {
-                                            Entity newSharePointFile = new Entity("ts_sharepointfile");
+                    //                    //If the SharePoint File doesn't exist for the WorkOrder, create it
+                    //                    if (workOrderSharePointFileGroup == null)
+                    //                    {
+                    //                        Entity newSharePointFile = new Entity("ts_sharepointfile");
 
-                                            newSharePointFile.Attributes["ts_tablerecordid"] = workOrderIdString;
-                                            newSharePointFile.Attributes["ts_tablename"] = WorkOrder;
-                                            newSharePointFile.Attributes["ts_tablenamefrench"] = WorkOrderFr;
-                                            newSharePointFile.Attributes["ts_tablerecordname"] = workOrderIdValue.Name;
-                                            newSharePointFile.Attributes["ts_tablerecordowner"] = sharePointFileItem.TableRecordOwner;
+                    //                        newSharePointFile.Attributes["ts_tablerecordid"] = workOrderIdString;
+                    //                        newSharePointFile.Attributes["ts_tablename"] = WorkOrder;
+                    //                        newSharePointFile.Attributes["ts_tablenamefrench"] = WorkOrderFr;
+                    //                        newSharePointFile.Attributes["ts_tablerecordname"] = workOrderIdValue.Name;
+                    //                        newSharePointFile.Attributes["ts_tablerecordowner"] = sharePointFileItem.TableRecordOwner;
 
-                                            Guid newSharePointFileID = svc.Create(newSharePointFile);
+                    //                        Guid newSharePointFileID = svc.Create(newSharePointFile);
 
-                                            var workOrderSharePointFileItem = new SharePointFileItem
-                                            {
-                                                SharePointFileId = newSharePointFileID.ToString(),
-                                                TableRecordId = workOrderIdString,
-                                                TableName = Case,
-                                                TableNameFrench = CaseFr,
-                                                TableRecordName = workOrderIdValue.Name
-                                            };
+                    //                        var workOrderSharePointFileItem = new SharePointFileItem
+                    //                        {
+                    //                            SharePointFileId = newSharePointFileID.ToString(),
+                    //                            TableRecordId = workOrderIdString,
+                    //                            TableName = Case,
+                    //                            TableNameFrench = CaseFr,
+                    //                            TableRecordName = workOrderIdValue.Name
+                    //                        };
 
-                                            workOrderSharePointFileGroup = GetOrCreateSharePointFileGroup(svc, workOrderSharePointFileItem, false);
-                                        }
+                    //                        workOrderSharePointFileGroup = GetOrCreateSharePointFileGroup(svc, workOrderSharePointFileItem, false);
+                    //                    }
 
-                                        string sharePointFileGroupId = "";
+                    //                    string sharePointFileGroupId = "";
 
-                                        // This is here because it can return a sharePointFile or sharePointFileGroup - sorry...
-                                        if (workOrderSharePointFileGroup.GetAttributeValue<EntityReference>("ts_sharepointfilegroup") == null)
-                                        {
-                                            sharePointFileGroupId = workOrderSharePointFileGroup.Id.ToString();
-                                        }
-                                        else
-                                        {
-                                            sharePointFileGroupId = workOrderSharePointFileGroup.GetAttributeValue<EntityReference>("ts_sharepointfilegroup").Id.ToString();
-                                        }
+                    //                    // This is here because it can return a sharePointFile or sharePointFileGroup - sorry...
+                    //                    if (workOrderSharePointFileGroup.GetAttributeValue<EntityReference>("ts_sharepointfilegroup") == null)
+                    //                    {
+                    //                        sharePointFileGroupId = workOrderSharePointFileGroup.Id.ToString();
+                    //                    }
+                    //                    else
+                    //                    {
+                    //                        sharePointFileGroupId = workOrderSharePointFileGroup.GetAttributeValue<EntityReference>("ts_sharepointfilegroup").Id.ToString();
+                    //                    }
 
-                                        //Set the SharePointFileGroupId of the SharePointFile for the Work Order
-                                        sharePointFileItem.SharePointFileGroupId = sharePointFileGroupId;
+                    //                    //Set the SharePointFileGroupId of the SharePointFile for the Work Order
+                    //                    sharePointFileItem.SharePointFileGroupId = sharePointFileGroupId;
 
-                                        // Update the SharePointFile
-                                        GetOrCreateSharePointFileGroup(svc, sharePointFileItem, true);
-                                    }
-                                    else
-                                    {
-                                        // Give the Work Order Service Task it's own separate SharePointFileGroup
-                                        sharePointFileItem.SharePointFileGroupId = GetOrCreateSharePointFileGroup(svc, sharePointFileItem).Id.ToString();
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                // Check if the SharePointFileGroup exists
-                                if (string.IsNullOrWhiteSpace(sharePointFileItem.SharePointFileGroupId))
-                                {
-                                    var sharePointFileGroup = GetOrCreateSharePointFileGroup(svc, sharePointFileItem);
-                                    sharePointFileItem.SharePointFileGroupId = sharePointFileGroup.Id.ToString();
-                                }
-                            }
+                    //                    // Update the SharePointFile
+                    //                    GetOrCreateSharePointFileGroup(svc, sharePointFileItem, true);
+                    //                }
+                    //                else
+                    //                {
+                    //                    // Give the Work Order Service Task it's own separate SharePointFileGroup
+                    //                    sharePointFileItem.SharePointFileGroupId = GetOrCreateSharePointFileGroup(svc, sharePointFileItem).Id.ToString();
+                    //                }
+                    //            }
+                    //        }
+                    //        else
+                    //        {
+                    //            // Check if the SharePointFileGroup exists
+                    //            if (string.IsNullOrWhiteSpace(sharePointFileItem.SharePointFileGroupId))
+                    //            {
+                    //                var sharePointFileGroup = GetOrCreateSharePointFileGroup(svc, sharePointFileItem);
+                    //                sharePointFileItem.SharePointFileGroupId = sharePointFileGroup.Id.ToString();
+                    //            }
+                    //        }
 
-                            counter++;
-                            Console.WriteLine($"SharePoint File Group {counter} of {sharePointFileItems.Count()} completed");
-                            Console.WriteLine($"---------------------------------------------");
-                        }
-                    }
+                    //        counter++;
+                    //        Console.WriteLine($"SharePoint File Group {counter} of {sharePointFileItems.Count()} completed");
+                    //        Console.WriteLine($"---------------------------------------------");
+                    //    }
+                    //}
 
                     // Upload all the files to SharePoint
                     {
                         int fileCounter = 0;
+                        int totalFileCount = fileItems.Count(x => x.UploadedToSharePoint == false && x.SharePointFileId != null && x.Attachment != "00000000-0000-0000-0000-000000000000");
 
-                        foreach (var fileItem in fileItems.Where(x => x.UploadedToSharePoint == false && 
-                        x.SharePointFileId != null && 
-                        x.FileOwner.Contains("Intermodal Surface Security Oversight (ISSO)") &&
+                        foreach (var fileItem in fileItems.Where(x => x.UploadedToSharePoint == false &&
+                        x.SharePointFileId != null &&
                         x.Attachment != "00000000-0000-0000-0000-000000000000"))
                         {
-                            // Upload Attachment
-                            Task<bool> uploadTask = UploadAttachmentPowerAutomateAsync(fileItem,fileCounter);
+                            bool fileOwnerValid = true;
 
-                            await Task.WhenAll(uploadTask);
+                            IsOwnerValid(fileItem, ref fileOwnerValid);
 
-                            // If we have uploaded the file successfully, update the File
-                            if (uploadTask.Result)
+                            IsFileCategoryValid(fileItem, fileItem.FileOwner);
+
+                            if (fileOwnerValid)
                             {
-                                ColumnSet columns = new ColumnSet(true);
+                                // Upload Attachment
+                                Task<bool> uploadTask = UploadAttachmentPowerAutomateAsync(fileItem, fileCounter, totalFileCount);
 
-                                Guid fileGuid = new Guid(fileItem.FileId);
+                                await Task.WhenAll(uploadTask);
 
-                                Entity fileRecord = svc.Retrieve("ts_file", fileGuid, columns);
+                                // If we have uploaded the file successfully, update the File
+                                if (uploadTask.Result)
+                                {
+                                    ColumnSet columns = new ColumnSet(true);
 
-                                fileRecord.Attributes["ts_uploadedtosharepoint"] = true;
+                                    Guid fileGuid = new Guid(fileItem.FileId);
 
-                                svc.Update(fileRecord);
+                                    Entity fileRecord = svc.Retrieve("ts_file", fileGuid, columns);
+
+                                    fileRecord.Attributes["ts_uploadedtosharepoint"] = true;
+
+                                    svc.Update(fileRecord);
+                                }
+
+                                fileCounter++;
                             }
-
-                            fileCounter++;
                         }
                     }
                 }
@@ -710,9 +757,15 @@ namespace ROM.TSIS2.CSharpAPIDemo
             }
         }
 
-        private static async Task<bool> UploadAttachmentPowerAutomateAsync(FileItem fileItem, int count)
+        private static async Task<bool> UploadAttachmentPowerAutomateAsync(FileItem fileItem, int count, int totalCount)
         {
-            string flowEndpointUrl = "https://prod-08.canadacentral.logic.azure.com:443/workflows/5770469a718943aea1e4d87b9ec3c769/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=151Hbu33fqLvsCHsvQesCSMLHNreNezie9sOhAERvWE"; // Replace with your actual flow endpoint URL
+            // Move Files to SharePoint - ROMTS-GSRST.Flows
+            //string devURL = "https://prod-08.canadacentral.logic.azure.com:443/workflows/5770469a718943aea1e4d87b9ec3c769/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=151Hbu33fqLvsCHsvQesCSMLHNreNezie9sOhAERvWE";
+
+            string prodURL = "https://prod-08.canadacentral.logic.azure.com:443/workflows/3578d30a6d1f481a9b344afea45b3497/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=gQNND8iNEBLaBI0uF2vfWuw1jd1fsicMwyyS1Nae0kQ";
+
+            //string flowEndpointUrl = devURL;
+            string flowEndpointUrl = prodURL;
 
             HttpClient client = new HttpClient();
             client.BaseAddress = new Uri(flowEndpointUrl);
@@ -720,6 +773,27 @@ namespace ROM.TSIS2.CSharpAPIDemo
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, client.BaseAddress);
+
+            // Remove any invalid characters in the file name
+            string fileName = fileItem.FileName;
+            string extension = System.IO.Path.GetExtension(fileName);
+
+            // List of invalid characters
+            List<char> invalidChars = new List<char> { '~', '#', '%', '&', '*', '{', '}', '\\', ':', '<', '>', '?', '/', '+', '|', '"' };
+
+            foreach (char c in invalidChars)
+            {
+                fileName = fileName.Replace(c.ToString(), string.Empty);
+            }
+
+            // Ensure that the file extension is preserved
+            if (!fileName.EndsWith(extension))
+            {
+                fileName += extension;
+            }
+
+            // Apply the changes to fileItem.FileName
+            fileItem.FileName = fileName;
 
             // Serialize the byte array to a JSON string and convert it to Base64
             string jsonPayload = JsonConvert.SerializeObject(new { 
@@ -729,7 +803,9 @@ namespace ROM.TSIS2.CSharpAPIDemo
                 CategoryEnglish = fileItem.CategoryEnglish,
                 CategoryFrench = fileItem.CategoryFrench,
                 FileDescription = fileItem.FileDescription,
-                FileOwner = fileItem.FileOwner
+                FileOwner = fileItem.FileOwner,
+                TableName = fileItem.SharePointTableName,
+                TableRecordName = fileItem.SharePointTableRecordName
             });
 
             var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -738,12 +814,12 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
             if (response == "File uploaded to SharePoint")
             {
-                Console.WriteLine($"Number {count} File: {fileItem.FileName} -  {response}");
+                Console.WriteLine($"Number( {count} of {totalCount} ) File: {fileItem.FileName} -  {response}");
                 return true;
             }
             else
             {
-                Console.WriteLine($"Number {count} File: {fileItem.FileName} -  Was not uploaded due to an error");
+                Console.WriteLine($"Number ( {count} of {totalCount} ) File: {fileItem.FileName} -  Was not uploaded due to an error");
                 return false;
             }
         }
@@ -767,7 +843,10 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
         public static List<FileItem> GetFileItems(IOrganizationService svc, string fetchXml, string entityIdAttribute, string fileIdAttribute)
         {
-            EntityCollection files = svc.RetrieveMultiple(new FetchExpression(fetchXml));
+            //EntityCollection files = svc.RetrieveMultiple(new FetchExpression(fetchXml));
+
+            EntityCollection files = RetrieveAllRecordsUsingPaging(svc, new FetchExpression(fetchXml));
+
             List<FileItem> fileItems = new List<FileItem>();
 
             // Create a dictionary to map entityIdAttribute to corresponding property name
@@ -787,7 +866,40 @@ namespace ROM.TSIS2.CSharpAPIDemo
             {
                 string fileId = file.GetAttributeValue<Guid>("ts_fileid").ToString();
                 Guid recordId = file.GetAttributeValue<Guid>(entityIdAttribute);
-                string tableRecordName = file.GetAttributeValue<AliasedValue>("tablerecordname").Value?.ToString();
+                string tableRecordName = "";
+
+                // in case we have Stakeholders that have only the Account Named filled out and not the Legal Name
+                if (file.GetAttributeValue<AliasedValue>("tablerecordname") is null && file.LogicalName == "ts_files_accounts")
+                {
+                    tableRecordName = file.GetAttributeValue<AliasedValue>("tablerecordnamebackup").Value?.ToString();
+
+                    if (tableRecordName.Contains("::"))
+                    {
+                        string[] parts = tableRecordName.Split(new string[] { "::" }, StringSplitOptions.None);
+                        tableRecordName = parts[0];
+                    }
+
+                    if (tableRecordName.Length > 100)
+                    {
+                        tableRecordName = tableRecordName.Substring(0, 100);
+                    }
+                }
+                else
+                {
+                    tableRecordName = file.GetAttributeValue<AliasedValue>("tablerecordname").Value?.ToString();
+
+                    if (tableRecordName.Contains("::"))
+                    {
+                        string[] parts = tableRecordName.Split(new string[] { "::" }, StringSplitOptions.None);
+                        tableRecordName = parts[0];
+                    }
+
+                    if (tableRecordName.Length > 100)
+                    {
+                        tableRecordName = tableRecordName.Substring(0, 100);
+                    }
+                }
+
 
                 string propertyName = entityPropertyMap[entityIdAttribute];
 
@@ -836,7 +948,7 @@ namespace ROM.TSIS2.CSharpAPIDemo
                     if (!usingExistingSharePointFileGroup)
                     {
                         sharePointFileGroupID = svc.Create(newSharePointFileGroup);
-
+                        
                         // prevent an error by getting the new SharePoint File Group
                         newSharePointFileGroup = svc.Retrieve("ts_sharepointfilegroup", sharePointFileGroupID, columns);
                     }
@@ -874,6 +986,201 @@ namespace ROM.TSIS2.CSharpAPIDemo
 
             return entity;
         }
+
+        public static void IsOwnerValid(FileItem fileItem, ref bool fileOwnerValid)
+        {
+            if (fileItem.FileOwner.Contains("Aviation Security"))
+            {
+                fileItem.FileOwner = "Aviation Security";
+            }
+            else if (fileItem.FileOwner.Contains("Intermodal Surface Security Oversight (ISSO)"))
+            {
+                fileItem.FileOwner = "Intermodal Surface Security Oversight (ISSO)";
+            }
+            else
+            {
+                fileOwnerValid = false;
+            }
+        }
+
+        public static void IsFileCategoryValid(FileItem fileItem,string owner)
+        {
+            List<AvSecFileCategory> avsecFileCategories = new List<AvSecFileCategory>
+            {
+                new AvSecFileCategory { EnglishName = "Supporting Documentation - Email communication", FrenchName = "Document(s) justificatifs - Correspondance par courriel" },
+                new AvSecFileCategory { EnglishName = "Supporting Documentation - Photograph", FrenchName = "Document(s) justificatifs - Photographie" },
+                new AvSecFileCategory { EnglishName = "Supporting Documentation - Site map / diagram /schematic", FrenchName = "Document(s) justificatifs - Plan du site / diagramme / schéma" },
+                new AvSecFileCategory { EnglishName = "Supporting Documentation - Letter", FrenchName = "Document(s) justificatifs - Lettre" },
+                new AvSecFileCategory { EnglishName = "Supporting Documentation - Training Record", FrenchName = "Document(s) justificatifs - Dossier de formation" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Emergency Response Plan (ERP)", FrenchName = "Document(s) des intervenants - Plan d'intervention d'urgence" },
+                new AvSecFileCategory { EnglishName = "Supporting Documentation - Note to file", FrenchName = "Document(s) justificatifs - Note au dossier" },
+                new AvSecFileCategory { EnglishName = "Supporting Documentation - Inspection Questionnaire", FrenchName = "Document(s) justificatifs - Questionnaire d'inspection" },
+                new AvSecFileCategory { EnglishName = "Supporting Documentation - Incident Report", FrenchName = "Document(s) justificatifs - Rapport d'incident" },
+                new AvSecFileCategory { EnglishName = "Supporting Documentation - Other", FrenchName = "Document(s) justificatifs - Autre" },
+                new AvSecFileCategory { EnglishName = "Internal Reference Material - Standard Operation Procedure (SOP)", FrenchName = "Élément(s) de référence interne - Procédure opérationnelle normalisée (PON)" },
+                new AvSecFileCategory { EnglishName = "Internal Reference Material - User Guides", FrenchName = "Élément(s) de référence interne - Guide de l'utilisateur" },
+                new AvSecFileCategory { EnglishName = "Internal Reference Material - Staff Instructions (SI)", FrenchName = "Élément(s) de référence interne - Instruction spéciale (IS)" },
+                new AvSecFileCategory { EnglishName = "Internal Reference Material - Legislation", FrenchName = "Élément(s) de référence interne - Législation" },
+                new AvSecFileCategory { EnglishName = "Internal Reference Material - Exemption", FrenchName = "Élément(s) de référence interne - Exemption" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Stakeholder Contact Information", FrenchName = "Document(s) des intervenants - Information sur les personnes-ressources des intervenants ou des partenaires" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Security Plan (SP)", FrenchName = "Document(s) des intervenants - Plan de sûreté (PS)" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Risk Assessment (SRA)", FrenchName = "Document(s) des intervenants - Évaluation des risques" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Railway Carrier Profile", FrenchName = "Document(s) des intervenants - Profil du transporteur ferroviaire" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Railway Loader Profile", FrenchName = "Document(s) des intervenants - Profil du chargeur ferroviaire" },
+                new AvSecFileCategory { EnglishName = "Supporting Documentation - Training Material", FrenchName = "Document(s) justificatifs - Matériel de formation" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Canadian Aviation Document (CAD)", FrenchName = "Document(s) des intervenants - Document d'aviation Canadien (DAC)" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Railway Operating Certificate (ROC)", FrenchName = "Document(s) des intervenants - Certificat d'exploitation de chemin de fer" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Exercise", FrenchName = "Document(s) des intervenants - Exercice" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Other", FrenchName = "Document(s) des intervenants - Autre" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Site map / diagram / schematic", FrenchName = "Document(s) des intervenants - Plan du site / diagramme / schéma" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Training Record", FrenchName = "Document(s) des intervenants - Dossier de formation" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Passenger Profile", FrenchName = "Document(s) des intervenants - Profil de compagnie de transport de voyageurs" },
+                new AvSecFileCategory { EnglishName = "Stakeholder Documentation - Training Material", FrenchName = "Document(s) des intervenants - Matériel de formation" },
+                new AvSecFileCategory { EnglishName = "Supporting Documentation - Findings Report", FrenchName = "Document(s) justificatifs - Rapports de constatations" }
+            };
+
+            List<IssoFileCategory> issoCategories = new List<IssoFileCategory>
+            {
+                new IssoFileCategory { EnglishName = "Supporting Documentation - Email communication", FrenchName = "Document(s) justificatifs - Correspondance par courriel" },
+                new IssoFileCategory { EnglishName = "Supporting Documentation - Photograph", FrenchName = "Document(s) justificatifs - Photographie" },
+                new IssoFileCategory { EnglishName = "Supporting Documentation - Site map / diagram /schematic", FrenchName = "Document(s) justificatifs - Plan du site / diagramme / schéma" },
+                new IssoFileCategory { EnglishName = "Supporting Documentation - Letter", FrenchName = "Document(s) justificatifs - Lettre" },
+                new IssoFileCategory { EnglishName = "Supporting Documentation - Training Record", FrenchName = "Document(s) justificatifs - Dossier de formation" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Emergency Response Plan (ERP)", FrenchName = "Document(s) des intervenants - Plan d'intervention d'urgence" },
+                new IssoFileCategory { EnglishName = "Supporting Documentation - Note to file", FrenchName = "Document(s) justificatifs - Note au dossier" },
+                new IssoFileCategory { EnglishName = "Supporting Documentation - Inspection Questionnaire", FrenchName = "Document(s) justificatifs - Questionnaire d'inspection" },
+                new IssoFileCategory { EnglishName = "Supporting Documentation - Incident Report", FrenchName = "Document(s) justificatifs - Rapport d'incident" },
+                new IssoFileCategory { EnglishName = "Supporting Documentation - Other", FrenchName = "Document(s) justificatifs - Autre" },
+                new IssoFileCategory { EnglishName = "Internal Reference Material - Standard Operation Procedure (SOP)", FrenchName = "Élément(s) de référence interne - Procédure opérationnelle normalisée (PON)" },
+                new IssoFileCategory { EnglishName = "Internal Reference Material - User Guides", FrenchName = "Élément(s) de référence interne - Guide de l'utilisateur" },
+                new IssoFileCategory { EnglishName = "Internal Reference Material - Staff Instructions (SI)", FrenchName = "Élément(s) de référence interne - Instruction spéciale (IS)" },
+                new IssoFileCategory { EnglishName = "Internal Reference Material - Legislation", FrenchName = "Élément(s) de référence interne - Législation" },
+                new IssoFileCategory { EnglishName = "Internal Reference Material - Exemption", FrenchName = "Élément(s) de référence interne - Exemption" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Stakeholder Contact Information", FrenchName = "Document(s) des intervenants - Information sur les personnes-ressources des intervenants ou des partenaires" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Security Plan (SP)", FrenchName = "Document(s) des intervenants - Plan de sûreté (PS)" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Risk Assessment (SRA)", FrenchName = "Document(s) des intervenants - Évaluation des risques" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Railway Carrier Profile", FrenchName = "Document(s) des intervenants - Profil du transporteur ferroviaire" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Railway Loader Profile", FrenchName = "Document(s) des intervenants - Profil du chargeur ferroviaire" },
+                new IssoFileCategory { EnglishName = "Supporting Documentation - Training Material", FrenchName = "Document(s) justificatifs - Matériel de formation" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Canadian Aviation Document (CAD)", FrenchName = "Document(s) des intervenants - Document d'aviation Canadien (DAC)" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Railway Operating Certificate (ROC)", FrenchName = "Document(s) des intervenants - Certificat d'exploitation de chemin de fer" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Exercise", FrenchName = "Document(s) des intervenants - Exercice" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Other", FrenchName = "Document(s) des intervenants - Autre" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Site map / diagram / schematic", FrenchName = "Document(s) des intervenants - Plan du site / diagramme / schéma" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Training Record", FrenchName = "Document(s) des intervenants - Dossier de formation" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Passenger Profile", FrenchName = "Document(s) des intervenants - Profil de compagnie de transport de voyageurs" },
+                new IssoFileCategory { EnglishName = "Stakeholder Documentation - Training Material", FrenchName = "Document(s) des intervenants - Matériel de formation" },
+                new IssoFileCategory { EnglishName = "Supporting Documentation - Findings Report", FrenchName = "Document(s) justificatifs - Rapports de constatations" },
+                new IssoFileCategory { EnglishName = "Internal Reference material - Other", FrenchName = "Élément(s) de référence interne - Autre" }
+            };
+
+            string myFileCategory = fileItem.CategoryEnglish;
+
+            if (owner == "Aviation Security")
+            {
+                if (avsecFileCategories.Any(x => x.EnglishName == myFileCategory))
+                {
+                    // do nothing since the category is good
+                }
+                else
+                {
+                    fileItem.CategoryEnglish = "Supporting Documentation - Other";
+                    fileItem.CategoryFrench = "Document(s) justificatifs - Autre";
+                }
+            }
+            else if(owner == "Intermodal Surface Security Oversight (ISSO)")
+            {
+                if (issoCategories.Any(x => x.EnglishName == myFileCategory))
+                {
+                    // do nothing since the category is good
+                }
+                else
+                {
+                    fileItem.CategoryEnglish = "Supporting Documentation - Other";
+                    fileItem.CategoryFrench = "Document(s) justificatifs - Autre";
+                }
+            }
+        }
+
+        public static EntityCollection RetrieveAllRecordsUsingPaging(IOrganizationService service, FetchExpression fetchExpression)
+        {
+            // Use the FetchXmlToQueryExpressionRequest message to convert the FetchExpression to a QueryExpression.
+            FetchXmlToQueryExpressionRequest conversionRequest = new FetchXmlToQueryExpressionRequest
+            {
+                FetchXml = fetchExpression.Query
+            };
+
+            FetchXmlToQueryExpressionResponse conversionResponse = (FetchXmlToQueryExpressionResponse)service.Execute(conversionRequest);
+
+            // The QueryExpression is now available.
+            QueryExpression query = conversionResponse.Query;
+
+            var pageNumber = 1;
+            var pagingCookie = string.Empty;
+            var result = new EntityCollection();
+            EntityCollection resp = null;
+
+            do
+            {
+                if (pageNumber != 1)
+                {
+                    query.PageInfo.PageNumber = pageNumber;
+                    query.PageInfo.PagingCookie = pagingCookie;
+                }
+
+                resp = service.RetrieveMultiple(query);
+
+                if (resp.MoreRecords)
+                {
+                    pageNumber++;
+                    pagingCookie = resp.PagingCookie;
+                }
+
+                // Add the result from RetrieveMultiple to the EntityCollection to be returned.
+                result.Entities.AddRange(resp.Entities);
+            }
+            while (resp != null && resp.MoreRecords);
+
+            return result;
+        }
+    
+        public static Entity CheckIfSharePointFileExists(FileItemGroup fileItemGroup, CrmServiceClient svc,Entity sharePointFile,EntityCollection sharePointFiles, string recordId)
+        {
+            // find out if the ts_sharepointfile already exists
+            if (sharePointFiles.Entities.Count > 0)
+            {
+                //sharePointFile = sharePointFiles.Entities.FirstOrDefault(e => e.Attributes["ts_tablerecordid"].ToString().ToUpper() == fileItem.TableRecordId.ToUpper());
+                foreach (var item in sharePointFiles.Entities)
+                {
+                    if (fileItemGroup != null)
+                    {
+                        if (item.GetAttributeValue<string>("ts_tablerecordid").ToUpper() == fileItemGroup.Id.ToString().ToUpper())
+                        {
+                            sharePointFile = item;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // if it is null - then do a check just to be sure
+            if (sharePointFile == null)
+            {
+                if (fileItemGroup != null)
+                {
+                    sharePointFiles = svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.Single_SharePointFile(fileItemGroup.Id.ToString())));
+
+                }
+                else
+                {
+                    svc.RetrieveMultiple(new FetchExpression(FetchXMLExamples.Single_SharePointFile(recordId)));
+                }
+
+                sharePointFile = sharePointFiles.Entities.Count > 0 ? sharePointFiles.Entities[0] : null;
+            }
+
+            return sharePointFile;
+        }
     }
 
     public class FileItem
@@ -901,6 +1208,8 @@ namespace ROM.TSIS2.CSharpAPIDemo
         public string FileDescription { get; set; }
         public string SharePointFileId { get; set; }
         public string Attachment { get; set; }
+        public string SharePointTableName { get; set; }
+        public string SharePointTableRecordName { get; set; }
     }
 
     public class FileItemGroup
@@ -951,4 +1260,17 @@ namespace ROM.TSIS2.CSharpAPIDemo
         public string ExcemptionId { get; set; }
         public string ExemptionNumber { get; set; }
     }
+
+    public class AvSecFileCategory
+    {
+        public string EnglishName { get; set; }
+        public string FrenchName { get; set; }
+    }
+
+    public class IssoFileCategory
+    {
+        public string EnglishName { get; set; }
+        public string FrenchName { get; set; }
+    }
+
 }

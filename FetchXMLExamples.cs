@@ -64,6 +64,10 @@ namespace ROM.TSIS2.CSharpAPIDemo
                 <attribute name='ts_formintegrationid' />
                 <attribute name='ts_description' />
                 <attribute name='ts_attachment' />
+                <filter type='or'>
+                  <condition attribute='ts_uploadedtosharepoint' operator='eq' value='False' />
+                  <condition attribute='ts_uploadedtosharepoint' operator='null' />
+                </filter>               
                 <link-entity name='owner' to='ownerid' from='ownerid' alias='owner' link-type='inner'>
                   <attribute name='name' alias='FileOwner' />
                 </link-entity>
@@ -158,6 +162,7 @@ namespace ROM.TSIS2.CSharpAPIDemo
                 <attribute name='ts_fileid' />
                 <link-entity name='account' to='accountid' from='accountid' alias='account' link-type='inner'>
                   <attribute name='ovs_legalname' alias='tablerecordname' />
+                  <attribute name='name' alias='tablerecordnamebackup' />
                 </link-entity>
               </entity>
             </fetch>        
@@ -244,5 +249,20 @@ namespace ROM.TSIS2.CSharpAPIDemo
               </entity>
             </fetch>
         ";
+
+        public static string All_Existing_SharePointFiles =
+        $@"
+            <fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+                <entity name='ts_sharepointfile'>
+                <attribute name='ts_sharepointfilegroup' />
+                <attribute name='ts_sharepointfileid' />
+                <attribute name='ts_tablename' />
+                <attribute name='ts_tablenamefrench' />
+                <attribute name='ts_tablerecordid' />
+                <attribute name='ts_tablerecordname' />
+                </entity>
+            </fetch>            
+        ";
+        
     }
 }
