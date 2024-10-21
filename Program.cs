@@ -49,6 +49,7 @@ namespace ROM.TSIS2.CSharpAPIDemo
                             <attribute name='ts_name' />
                             <attribute name='ts_processed' />
                             <attribute name='ts_attachment' />
+                            <attribute name='ts_tcscprecordurl' />
                           </entity>
                         </fetch>                    
                     ";
@@ -65,16 +66,20 @@ namespace ROM.TSIS2.CSharpAPIDemo
                         Console.WriteLine($"ts_name: {record.GetAttributeValue<String>("ts_name")}");
                         Console.WriteLine($"ts_processed: {record.GetAttributeValue<Boolean>("ts_processed").ToString()}");
                         Console.WriteLine($"ts_attachment: {record.GetAttributeValue<System.Guid>("ts_attachment").ToString()}");
+                        Console.WriteLine($"Record URL: {record.GetAttributeValue<String>("ts_tcscprecordurl")}");
                         Console.WriteLine();
                     }
                 }
 
-                // EXAMPLE - Create a record with an attachment
+                // EXAMPLE - Create a record with an attachment and a URL
                 {
                     Entity newRecord = new Entity("ts_tcscp");
 
                     // Set the name for the new record
                     newRecord.Attributes["ts_name"] = "My New Record 1";
+
+                    // Set the URL for the new record
+                    newRecord.Attributes["ts_tcscprecordurl"] = "https://github.com/tc-ca/ROM.TSIS2.CSharpAPIDemo/tree/TCSCP-Example";
 
                     // Record the ID (GUID) of the new record - Note: you have to create a record first before attaching a file
                     var newFileID = svc.Create(newRecord);
